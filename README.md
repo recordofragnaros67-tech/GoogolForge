@@ -44,3 +44,7 @@ AI-written code that uses risky calls (eval, exec, sockets, network) is blocked 
 ## Tests
 
 `.github/workflows/selftest.yml` runs every module's self-test on each push.
+
+## Pixel 8 tuning (v3.1)
+Every model call now sends `num_thread` (default **5**, the reported sweet spot for the Pixel 8's Tensor G3; more threads can slow it down).
+To try another value, add `"threads": 4` (or 6) to `~/googolforge/config.json`, then compare with `forge bench --quick`.

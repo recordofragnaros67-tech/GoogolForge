@@ -48,7 +48,7 @@ def post(path, body, timeout=600):
 
 
 def ai(prompt, model=None, fmt=None):
-    body = {"model": model or C["coder"], "prompt": prompt, "stream": False, "options": {"temperature": 0.2, "num_predict": 1536, "repeat_penalty": 1.1}}
+    body = {"model": model or C["coder"], "prompt": prompt, "stream": False, "options": {"temperature": 0.2, "num_predict": 1536, "repeat_penalty": 1.1, "num_thread": int(C.get("threads", 5))}}
     if fmt:
         body["format"] = fmt
     return post("/api/generate", body)["response"]

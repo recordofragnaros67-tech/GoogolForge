@@ -37,7 +37,7 @@ def log(msg):
 
 # ---------- AI calls ----------
 def ask(model, prompt, fmt=None, temp=0.2):
-    body = {"model": model, "prompt": prompt, "stream": False, "options": {"temperature": temp, "num_predict": 1536, "repeat_penalty": 1.1}}
+    body = {"model": model, "prompt": prompt, "stream": False, "options": {"temperature": temp, "num_predict": 1536, "repeat_penalty": 1.1, "num_thread": int(C.get("threads", 5))}}
     if fmt:
         body["format"] = fmt
     req = urllib.request.Request(C["ollama"] + "/api/generate", data=json.dumps(body).encode(),

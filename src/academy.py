@@ -32,7 +32,7 @@ C = conf()
 
 def ask(prompt, fmt=None, model=None, temp=0.3):
     body = {"model": model or C["coder"], "prompt": prompt, "stream": False,
-            "options": {"temperature": temp, "num_predict": 1536, "repeat_penalty": 1.1}}
+            "options": {"temperature": temp, "num_predict": 1536, "repeat_penalty": 1.1, "num_thread": int(C.get("threads", 5))}}
     if fmt:
         body["format"] = fmt
     req = urllib.request.Request(C["ollama"] + "/api/generate", data=json.dumps(body).encode(),

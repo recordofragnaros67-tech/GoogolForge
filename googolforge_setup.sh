@@ -62,7 +62,7 @@ def log(msg):
 
 # ---------- AI calls ----------
 def ask(model, prompt, fmt=None, temp=0.2):
-    body = {"model": model, "prompt": prompt, "stream": False, "options": {"temperature": temp, "num_predict": 1536, "repeat_penalty": 1.1}}
+    body = {"model": model, "prompt": prompt, "stream": False, "options": {"temperature": temp, "num_predict": 1536, "repeat_penalty": 1.1, "num_thread": int(C.get("threads", 5))}}
     if fmt:
         body["format"] = fmt
     req = urllib.request.Request(C["ollama"] + "/api/generate", data=json.dumps(body).encode(),
@@ -676,7 +676,7 @@ C = conf()
 
 def ask(prompt, fmt=None, model=None, temp=0.3):
     body = {"model": model or C["coder"], "prompt": prompt, "stream": False,
-            "options": {"temperature": temp, "num_predict": 1536, "repeat_penalty": 1.1}}
+            "options": {"temperature": temp, "num_predict": 1536, "repeat_penalty": 1.1, "num_thread": int(C.get("threads", 5))}}
     if fmt:
         body["format"] = fmt
     req = urllib.request.Request(C["ollama"] + "/api/generate", data=json.dumps(body).encode(),
@@ -1109,7 +1109,7 @@ C = conf()
 
 def ai(prompt, fmt=None, model=None):
     body = {"model": model or C["judge"], "prompt": prompt, "stream": False,
-            "options": {"temperature": 0.1, "num_predict": 1536, "repeat_penalty": 1.1}}
+            "options": {"temperature": 0.1, "num_predict": 1536, "repeat_penalty": 1.1, "num_thread": int(C.get("threads", 5))}}
     if fmt:
         body["format"] = fmt
     req = urllib.request.Request(C["ollama"] + "/api/generate", data=json.dumps(body).encode(),
@@ -2158,7 +2158,7 @@ C = conf()
 
 
 def ask(prompt, model):
-    body = {"model": model, "prompt": prompt, "stream": False, "options": {"temperature": 0.1, "num_predict": 1536, "repeat_penalty": 1.1}}
+    body = {"model": model, "prompt": prompt, "stream": False, "options": {"temperature": 0.1, "num_predict": 1536, "repeat_penalty": 1.1, "num_thread": int(C.get("threads", 5))}}
     req = urllib.request.Request(C["ollama"] + "/api/generate", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
     with NOPROXY.open(req, timeout=600) as r:
@@ -3415,7 +3415,7 @@ def post(path, body, timeout=600):
 
 
 def ai(prompt, model=None, fmt=None):
-    body = {"model": model or C["coder"], "prompt": prompt, "stream": False, "options": {"temperature": 0.2, "num_predict": 1536, "repeat_penalty": 1.1}}
+    body = {"model": model or C["coder"], "prompt": prompt, "stream": False, "options": {"temperature": 0.2, "num_predict": 1536, "repeat_penalty": 1.1, "num_thread": int(C.get("threads", 5))}}
     if fmt:
         body["format"] = fmt
     return post("/api/generate", body)["response"]

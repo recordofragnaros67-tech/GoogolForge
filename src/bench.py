@@ -67,7 +67,7 @@ C = conf()
 
 
 def ask(prompt, model):
-    body = {"model": model, "prompt": prompt, "stream": False, "options": {"temperature": 0.1, "num_predict": 1536, "repeat_penalty": 1.1}}
+    body = {"model": model, "prompt": prompt, "stream": False, "options": {"temperature": 0.1, "num_predict": 1536, "repeat_penalty": 1.1, "num_thread": int(C.get("threads", 5))}}
     req = urllib.request.Request(C["ollama"] + "/api/generate", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
     with NOPROXY.open(req, timeout=600) as r:
