@@ -2090,7 +2090,7 @@ set -e
 mkdir -p ~/googolforge
 cat > ~/googolforge/bench.py <<'BENCHEOF'
 #!/usr/bin/env python3
-"""GoogolForge Benchmark Arena v1.3 (Elite style, sealed hidden tests, Shootout, Hard mode, Team style) - turn "quality" into a number.
+"""GoogolForge Benchmark Arena v1.4 (Genius style with Smart Router, Elite style, sealed hidden tests, Shootout, Hard mode, Team style) - turn "quality" into a number.
 Ten fixed coding tasks with hidden tests. The coder model gets two tries per task
 (the second sees the error, like the real engine). Scores are saved so every
 model, prompt or version change is measured against the last one."""
@@ -2158,7 +2158,7 @@ C = conf()
 
 
 def ask(prompt, model):
-    body = {"model": model, "prompt": prompt, "stream": False, "options": {"temperature": 0.1, "num_predict": 1536, "repeat_penalty": 1.1, "num_thread": int(C.get("threads", 5))}}
+    body = {"model": model, "prompt": prompt, "stream": False, "options": {"temperature": 0.1, "num_predict": 1536, "repeat_penalty": 1.1, "num_thread": int(C.get("threads", 5))}, "keep_alive": C.get("keep_alive", "30m")}
     req = urllib.request.Request(C["ollama"] + "/api/generate", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
     with NOPROXY.open(req, timeout=600) as r:
@@ -2190,6 +2190,8 @@ STYLES = {
                "duplicates, boundaries). Write ONLY the code. " + RULES),
     "steps":  ("First list the edge cases in at most 3 short # comments, then write the code. " + RULES),
     "elite":  ("Write ONLY the Python code for this. " + RULES),
+    "algo":   ("First name the classic algorithm or data structure that solves this in one # comment, "
+               "then implement it carefully. " + RULES),
     "team":   ("You are the Coder on a team. Write ONLY the code and handle every edge case the Tester listed. " + RULES),
 }
 CANDIDATES = ["qwen2.5-coder:1.5b", "qwen2.5-coder:3b", "llama3.2:1b", "llama3.2:3b", "deepseek-coder:1.3b"]
@@ -2203,6 +2205,8 @@ def solve(spec, tests, model, asker=ask, style="plain"):
         prompt += "\nTester's edge cases:\n" + (cases or "")[:600]
     if style == "elite":
         return 1 if check(elite_code(spec, model, asker), tests)[0] else 0
+    if style == "genius":
+        return 1 if check(genius_code(spec, model, asker), tests)[0] else 0
     code = extract(asker(prompt, model))
     ok, err = check(code, tests)
     if ok:
@@ -2258,6 +2262,62 @@ def elite_code(spec, model, asker):
         n, f = self_score(fixed, mine)
         if n >= best_n:
             best, best_n, fail = fixed, n, f
+    return best
+
+
+def strong_model(model, lister=None):
+    """The bigger coder the router escalates to: config 'strong', else qwen2.5-coder:3b if installed."""
+    want = C.get("strong", "qwen2.5-coder:3b")
+    if want == model:
+        return None
+    try:
+        have = (lister or installed_models)()
+    except Exception:
+        return None
+    return want if want in have else None
+
+
+def pick(drafts, mine):
+    """CodeT-style choice: tests passed first, then how many drafts behave the same way (agreement)."""
+    sigs = []
+    for c in drafts:
+        sigs.append(tuple(check(c, a)[0] for a in mine) if mine else (check(c, "")[0],))
+    best = None
+    for i, (c, sg) in enumerate(zip(drafts, sigs)):
+        key = (sum(sg), sigs.count(sg), -i)
+        if best is None or key > best[0]:
+            best = (key, c, sg)
+    return best[1], best[0][0]
+
+
+def genius_code(spec, model, asker, lister=None):
+    """Genius style (v3.3): Fischer-style preparation.
+    1) 4 different opening drafts from the fast model (plain, expert, steps, algo).
+    2) Spec tests written by the strongest model available (never sees hidden tests).
+    3) CodeT choice: most self-tests passed, ties broken by agreement between drafts.
+    4) Smart Router: if the best draft still fails its own tests, escalate to the strong model
+       for 2 fresh drafts plus up to 2 sealed self-repairs."""
+    strong = strong_model(model, lister)
+    judge = strong or model
+    drafts = [extract(asker(STYLES[s] + spec, model)) for s in ("plain", "expert", "steps", "algo")]
+    mine = spec_tests(spec, judge, asker)
+    best, n = pick(drafts, mine)
+    if mine and n == len(mine):
+        return best
+    coder = strong or model
+    if strong:
+        drafts += [extract(asker(STYLES[s] + spec, strong)) for s in ("expert", "algo")]
+        best, n = pick(drafts, mine)
+    for _ in range(2):
+        if not mine or n == len(mine):
+            break
+        fail = self_score(best, mine)[1]
+        fixed = extract(asker(STYLES["plain"] + spec + f"\nThis attempt fails this check:\n{fail}\n"
+                              "If the check itself contradicts the task, keep the code correct for the task.\n"
+                              f"Attempt:\n{best}", coder))
+        m = self_score(fixed, mine)[0]
+        if m >= n:
+            best, n = fixed, m
     return best
 
 
@@ -2436,6 +2496,31 @@ def selftest():
     chk("elite style picks the draft that passes its own spec tests", solve(TASKS[0][2], TASKS[0][3], "m", fake_elite, "elite") == 1)
     chk("team style asks a Tester first and passes its edge cases on",
         solve(TASKS[0][2], TASKS[0][3], "m", fake3, "team") == 1 and "empty string" in seen[-1])
+    calls = []
+    C["strong"] = "big"
+    def fake_router(prompt, model):
+        calls.append(model)
+        if "assert statements" in prompt:
+            return "assert reverse_words('a b')=='b a'\nassert reverse_words('x')=='x'"
+        if model == "big":
+            return answers["reverse"]
+        return "```python\ndef reverse_words(s):\n    return s\n```"
+    chk("genius router escalates to the strong model when drafts fail",
+        check(genius_code(TASKS[0][2], "small", fake_router, lambda: ["small", "big"]), TASKS[0][3])[0] and "big" in calls)
+    calls.clear()
+    def fake_easy(prompt, model):
+        calls.append(model)
+        if "assert statements" in prompt:
+            return "assert reverse_words('a b')=='b a'"
+        return answers["reverse"]
+    genius_code(TASKS[0][2], "small", fake_easy, lambda: ["small", "big"])
+    chk("genius router keeps easy tasks on the fast model", calls.count("big") == 1)
+    chk("genius works with no strong model installed",
+        check(genius_code(TASKS[0][2], "small", fake_easy, lambda: ["small"]), TASKS[0][3])[0])
+    C.pop("strong", None)
+    good, bad = extract(answers["reverse"]), "def reverse_words(s):\n    return s\n"
+    chk("pick prefers the draft that passes more of its own tests",
+        pick([bad, good, bad], ["assert reverse_words('a b')=='b a'"])[0] == good)
     print(f"\nSELFTEST: {'ALL PASSED' if not fails else str(fails) + ' FAILED'}")
     return fails == 0
 
@@ -2477,7 +2562,7 @@ if __name__ == "__main__":
         history()
     else:
         rest = [x for x in a if not x.startswith("--")]
-        style = "elite" if "--elite" in a else "team" if "--team" in a else "plain"
+        style = "genius" if "--genius" in a else "elite" if "--elite" in a else "team" if "--team" in a else "plain"
         run(rest[0] if rest else None, "--quick" in a, style=style, hard="--hard" in a)
 BENCHEOF
 cat > ~/googolforge/gf.py <<'GFEOF'
@@ -2519,7 +2604,7 @@ HELP = f"""GoogolForge v{VERSION}
   Voice:     forge voice   forge voice --loop
   Memory:    forge lessons   (what the debugger has learned)
   Pro v3:    forge team "goal" | mutate FILE | explain FILE | index | rag "question" | duel | ci
-  Bench+:    forge bench --elite (best)   forge bench --hard   forge bench --team
+  Bench+:    forge bench --genius (best)   forge bench --elite   forge bench --hard   forge bench --team
   Plugins:   forge plugins   (drop a .py file in ~/googolforge/plugins to add a command)
   Measure:   forge bench          forge bench --quick      forge bench history
   Shootout:  forge shootout       forge shootout --prompts forge shootout --apply   forge shootout pull

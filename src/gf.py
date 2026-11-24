@@ -36,7 +36,7 @@ HELP = f"""GoogolForge v{VERSION}
   Voice:     forge voice   forge voice --loop
   Memory:    forge lessons   (what the debugger has learned)
   Pro v3:    forge team "goal" | mutate FILE | explain FILE | index | rag "question" | duel | ci
-  Bench+:    forge bench --elite (best)   forge bench --hard   forge bench --team
+  Bench+:    forge bench --genius (best)   forge bench --elite   forge bench --hard   forge bench --team
   Plugins:   forge plugins   (drop a .py file in ~/googolforge/plugins to add a command)
   Measure:   forge bench          forge bench --quick      forge bench history
   Shootout:  forge shootout       forge shootout --prompts forge shootout --apply   forge shootout pull
