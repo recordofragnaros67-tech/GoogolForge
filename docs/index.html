@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GoogolForge — Free offline AI coding on your phone</title>
+<meta name="description" content="GoogolForge is a free, offline AI coding forge for Android. Runs in Termux with local Ollama models. No cloud, no keys, no cost.">
+<style>
+:root{--bg:#0b0d12;--card:#141823;--line:#252b3a;--txt:#e8ebf2;--mut:#9aa3b5;--acc:#ff8a3d;--acc2:#ffd166;--ok:#4ade80}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+a{color:var(--acc2)}.wrap{max-width:960px;margin:0 auto;padding:0 20px}
+header{padding:72px 0 48px;background:radial-gradient(circle at 20% 0%,#3a1d0a 0,transparent 55%),radial-gradient(circle at 90% 20%,#2a2410 0,transparent 45%)}
+.badge{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:4px 12px;color:var(--mut);font-size:13px}
+h1{font-size:clamp(2.2rem,6vw,3.6rem);line-height:1.1;margin:16px 0 12px}h1 span{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{font-size:1.15rem;color:var(--mut);max-width:620px}
+.btns{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}.btn{padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:600}
+.btn.p{background:var(--acc);color:#140a02}.btn.s{border:1px solid var(--line);color:var(--txt)}
+section{padding:44px 0;border-top:1px solid var(--line)}h2{font-size:1.6rem;margin:0 0 16px}
+pre{background:#05070b;border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;color:var(--acc2)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px}.card h3{margin:0 0 6px;font-size:1.05rem}.card p{margin:0;color:var(--mut);font-size:.95rem}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--acc2)}
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:12px;overflow:hidden}th,td{padding:12px 14px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--mut);font-weight:600}
+.big{font-size:1.4rem;font-weight:700;color:var(--ok)}.note{color:var(--mut);font-size:.9rem}
+ol li{margin-bottom:8px}footer{padding:32px 0;color:var(--mut);font-size:.9rem;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+<span class="badge">v3.1 · Free · Open source · Offline</span>
+<h1>Your AI coding team, <span>in your pocket.</span></h1>
+<p class="lead">GoogolForge turns an Android phone into an offline AI coding forge. It runs in Termux with local Ollama models: no cloud, no API keys, no cost.</p>
+<div class="btns"><a class="btn p" href="#install">Install in one line</a><a class="btn s" href="https://github.com/recordofragnaros67-tech/GoogolForge">View on GitHub</a></div>
+</div></header>
+
+<section id="install"><div class="wrap">
+<h2>Install</h2>
+<p>Open Termux on Android (from F-Droid), connect to Wi-Fi (about 2.3 GB of models), and paste:</p>
+<pre>curl -fsSL https://raw.githubusercontent.com/recordofragnaros67-tech/GoogolForge/main/install.sh | bash</pre>
+<p class="note">Setup finishes with health checks. Then type <code>forge</code> for commands or <code>gf</code> to talk in plain English.</p>
+</div></section>
+
+<section><div class="wrap">
+<h2>What it does</h2>
+<div class="grid">
+<div class="card"><h3>AI Team</h3><p><code>forge team</code>: Architect, Coder, Tester and Referee build and test code together.</p></div>
+<div class="card"><h3>Benchmark Arena</h3><p><code>forge bench --elite</code>: sealed judge; hidden tests are never shown to the model.</p></div>
+<div class="card"><h3>Mutation testing</h3><p><code>forge mutate</code>: plants bugs and scores your tests out of 100.</p></div>
+<div class="card"><h3>Code memory</h3><p><code>forge rag</code>: answers questions about your own code.</p></div>
+<div class="card"><h3>Academy</h3><p>Lessons, quizzes and drills, with ranks from Pawn to Grandmaster.</p></div>
+<div class="card"><h3>Dashboard</h3><p><code>forge web</code>: installable, token-protected phone dashboard.</p></div>
+<div class="card"><h3>Model Shootout</h3><p><code>forge shootout --apply</code>: finds the best model and prompt style for your phone.</p></div>
+<div class="card"><h3>Auto-Publish</h3><p>Pushes to GitHub only when code passes compile and test gates.</p></div>
+</div>
+</div></section>
+
+<section><div class="wrap">
+<h2>Measured results</h2>
+<table>
+<tr><th>Benchmark</th><th>Plain</th><th>Elite</th></tr>
+<tr><td>Standard (10 tasks)</td><td>80</td><td class="big">90</td></tr>
+<tr><td>Hard (6 tasks)</td><td>17</td><td class="big">50</td></tr>
+</table>
+<p class="note">Sealed judge, qwen2.5-coder:1.5b, ARM64 test machine. Pixel 8 results will be added after the first on-device run. Scores are never inflated.</p>
+</div></section>
+
+<section><div class="wrap">
+<h2>The genius method</h2>
+<ol>
+<li><b>Deep preparation.</b> The Architect writes a spec and tests before any code.</li>
+<li><b>Several candidate moves.</b> Elite mode drafts three solutions and lets the tests choose.</li>
+<li><b>Self-repair.</b> Failures are fixed from the error type only, so the judge stays honest.</li>
+<li><b>Two-model review.</b> A second model checks the work before it ships.</li>
+</ol>
+</div></section>
+
+<section><div class="wrap">
+<h2>Safety</h2>
+<p>AI-written code that uses risky calls (eval, exec, sockets, network) is blocked until you approve it. CI runs every self-test, a Bandit security scan and a secret scan on each push.</p>
+</div></section>
+
+<footer><div class="wrap">GoogolForge · free and open source · <a href="https://github.com/recordofragnaros67-tech/GoogolForge">GitHub</a> · <a href="https://github.com/recordofragnaros67-tech/GoogolForge/blob/main/CONTRIBUTING.md">Contribute</a></div></footer>
+</body></html>

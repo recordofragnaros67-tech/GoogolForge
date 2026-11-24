@@ -4,9 +4,13 @@ A free, offline AI coding forge for Android phones. It runs in Termux with local
 
 ## Install (Termux on Android)
 
+One line:
+
 ```bash
-bash googolforge_setup.sh
+curl -fsSL https://raw.githubusercontent.com/recordofragnaros67-tech/GoogolForge/main/install.sh | bash
 ```
+
+Or from a downloaded file: `bash googolforge_setup.sh`
 
 The setup file installs everything and finishes with 14 health checks.
 
@@ -41,9 +45,11 @@ Phone (Pixel 8) results will be added after the first on-device run.
 
 AI-written code that uses risky calls (eval, exec, sockets, network) is blocked until you approve it. The publisher blocks commits that contain keys or tokens.
 
-## Tests
+## Tests and security
 
-`.github/workflows/selftest.yml` runs every module's self-test on each push.
+`selftest.yml` runs every module's self-test on each push. `security.yml` runs a Bandit scan and a secret scan.
+
+Website: `docs/` (GitHub Pages). Contributing: see `CONTRIBUTING.md`.
 
 ## Pixel 8 tuning (v3.1)
 Every model call now sends `num_thread` (default **5**, the reported sweet spot for the Pixel 8's Tensor G3; more threads can slow it down).

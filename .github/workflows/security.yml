@@ -1,0 +1,24 @@
+name: security
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Bandit (fails on high-severity, high-confidence issues)
+        run: |
+          pip install -q bandit
+          bandit -r src --severity-level high --confidence-level high
+          bandit -r src -f txt --exit-zero > bandit-report.txt || true
+      - name: Secret scan
+        run: |
+          if grep -rEn --exclude-dir=.git '(ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{60,}|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' .; then
+            echo "Possible secret found"; exit 1; fi
+          echo "No secrets found"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.txt
