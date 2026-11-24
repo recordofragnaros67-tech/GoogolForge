@@ -9,3 +9,9 @@ echo "Downloading GoogolForge setup..."
 curl -fsSL "$URL" -o "$DEST"
 bash -n "$DEST" || { echo "Download looks broken, try again on Wi-Fi"; exit 1; }
 bash "$DEST" </dev/tty
+echo
+echo "=================================================="
+echo "  IMPORTANT: reload your shortcuts before using forge:"
+echo "      exec bash"
+echo "  (or open a new Termux session)"
+echo "=================================================="

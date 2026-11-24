@@ -3916,6 +3916,14 @@ PLUGEOF
 fi
 python ~/googolforge/forge3.py ci
 python ~/googolforge/gf.py version
+echo "######## STEP J2: real forge and gf commands on PATH ########"
+BIN="${PREFIX:-/data/data/com.termux/files/usr}/bin"
+if [ -d "$BIN" ] && [ -w "$BIN" ]; then
+  printf '#!/data/data/com.termux/files/usr/bin/bash\nexec python "$HOME/googolforge/gf.py" "$@"\n' > "$BIN/forge"
+  printf '#!/data/data/com.termux/files/usr/bin/bash\nexec python "$HOME/googolforge/gf.py" chat "$@"\n' > "$BIN/gf"
+  chmod +x "$BIN/forge" "$BIN/gf"
+  echo "forge and gf installed in $BIN"
+fi
 echo "######## STEP K: final checks ########"
 git config --global user.name >/dev/null 2>&1 || git config --global user.name "Alex"
 git config --global user.email >/dev/null 2>&1 || git config --global user.email "alex@googolforge.local"
