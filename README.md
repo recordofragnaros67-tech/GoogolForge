@@ -71,3 +71,10 @@ v3.6 adds a Stress Probe: property checks built only from the task text (a negat
 The strongest model now acts like a tough exam setter: it lists the trickiest edge cases (empty input, negatives, multi-digit counts, round trips), writes tests for them from the task text only, and the coders must pass them. Broken tests with wrong function names are thrown out.
 
 `forge bench --genius --hard` uses four different opening drafts from the fast 1.5B model. The strongest installed model writes spec tests without ever seeing the hidden tests, and the drafts are scored CodeT-style. A task escalates to `qwen2.5-coder:3b` only when every draft still fails its own tests. Easy tasks stay fast. Models stay loaded for 30 minutes (`"keep_alive"` in config.json). Set `"strong"` in config.json to choose a different escalation model.
+
+## One-tap Genius exam on your phone (Termux)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/recordofragnaros67-tech/GoogolForge/main/scripts/genius_run.sh | bash
+```
+It updates GoogolForge, picks the strongest model your free RAM allows (7B, 3B or 1.5B), runs the sealed Hard exam in Genius mode, shows the wrong answers, and saves a report.
