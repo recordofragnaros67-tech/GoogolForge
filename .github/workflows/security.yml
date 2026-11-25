@@ -13,6 +13,10 @@ jobs:
           pip install -q bandit
           bandit -r src --severity-level high --confidence-level high
           bandit -r src -f txt --exit-zero > bandit-report.txt || true
+      - name: Ruff (real errors only)
+        run: |
+          pip install -q ruff
+          ruff check src --select E9,F
       - name: Secret scan
         run: |
           if grep -rEn --exclude-dir=.git '(ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{60,}|sk-[A-Za-z0-9]{32,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' .; then

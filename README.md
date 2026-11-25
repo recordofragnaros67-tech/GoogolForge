@@ -47,7 +47,7 @@ AI-written code that uses risky calls (eval, exec, sockets, network) is blocked 
 
 ## Tests and security
 
-`selftest.yml` runs every module's self-test on each push. `security.yml` runs a Bandit scan and a secret scan.
+`selftest.yml` runs every module's self-test on each push. `security.yml` runs Bandit, Ruff and a secret scan. `codeql.yml` runs GitHub CodeQL weekly and on every push.
 
 Website: `docs/` (GitHub Pages). Contributing: see `CONTRIBUTING.md`.
 
