@@ -27,7 +27,7 @@ ol li{margin-bottom:8px}footer{padding:32px 0;color:var(--mut);font-size:.9rem;b
 </head>
 <body>
 <header><div class="wrap">
-<span class="badge">v3.6 · Free · Open source · Offline</span>
+<span class="badge">v3.6.4 · Free · Open source · Offline</span>
 <h1>Your AI coding team, <span>in your pocket.</span></h1>
 <p class="lead">GoogolForge turns an Android phone into an offline AI coding forge. It runs in Termux with local Ollama models: no cloud, no API keys, no cost.</p>
 <div class="btns"><a class="btn p" href="#install">Install in one line</a><a class="btn s" href="https://github.com/recordofragnaros67-tech/GoogolForge">View on GitHub</a></div>
@@ -68,8 +68,14 @@ ol li{margin-bottom:8px}footer{padding:32px 0;color:var(--mut);font-size:.9rem;b
 <tr><th>Models (fast + strong)</th><th>Solved</th><th>Score</th><th>Time</th></tr>
 <tr><td>1.5B + 3B (v3.3)</td><td>4/6</td><td>67</td><td>420s</td></tr>
 <tr><td>1.5B + 3B (v3.5)</td><td>4/6</td><td>67</td><td>631s</td></tr>
-<tr><td>1.5B + 7B (v3.5)</td><td>5/6</td><td class="big">83</td><td>1462s</td></tr>
+<tr><td>1.5B + 7B (v3.5)</td><td>5/6</td><td>83</td><td>1462s</td></tr>
+<tr><td>1.5B + 7B (v3.6)</td><td>5/6</td><td>83</td><td>1359s</td></tr>
+<tr><td>1.5B + 3B (v3.6.1)</td><td>5/6</td><td>83</td><td>1055s</td></tr>
+<tr><td>1.5B + 7B (v3.6.3)</td><td>5/6</td><td>83</td><td>1719s</td></tr>
+<tr><td>1.5B + 3B (v3.6.4)</td><td>3/6</td><td>50</td><td>880s</td></tr>
+<tr><td>1.5B + 7B (v3.6.4)</td><td>6/6</td><td class="big">100</td><td>1139s</td></tr>
 </table>
+<p class="note">Honest note: the same setup varies from run to run (1.5B + 7B has scored 50 to 100), and v3.6 was tuned on these six tasks. A single 100 is a best run, not a guarantee.</p>
 <p class="note">Every arena run is logged in <a href="scores.json">scores.json</a>. Pixel 8 results will be added after the first on-device run.</p>
 </div></section>
 
