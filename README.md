@@ -59,6 +59,8 @@ To try another value, add `"threads": 4` (or 6) to `~/googolforge/config.json`, 
 
 v3.5 adds a Rule Lawyer draft (obeys exact rules, knows Python pitfalls like // flooring), a loss log (`forge bench losses` shows the exact wrong answer after a run), and `--strong=MODEL` to escalate to a bigger model such as qwen2.5-coder:7b.
 
+v3.6.1 adds a Rule Lawyer autofix (when the task says "truncating toward zero", `a // b` becomes `int(a / b)`) and puts the Python pitfalls into every repair.
+
 v3.6 adds a Stress Probe: property checks built only from the task text (a negative version of the task's own example must not crash; functions that undo each other must round-trip, including runs longer than 9). No answer key, no hidden tests.
 
 

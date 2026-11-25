@@ -113,7 +113,16 @@ CANDIDATES = ["qwen2.5-coder:1.5b", "qwen2.5-coder:3b", "llama3.2:1b", "llama3.2
 LAST = {}  # the final answer and error of the last task, kept for the loss log (never shown to the model)
 PITFALLS = ("Python pitfalls to check: // floors toward minus infinity (use int(a / b) to truncate toward zero); "
             "a token like '-7' is a negative number, not an operator; counts and numbers can have several digits; "
-            "empty input must return an empty result; a single item is a valid input. ")
+            "empty input must return an empty result; a single item is a valid input; to read a count with "
+            "several digits, collect consecutive digits (for example re.findall(r'(\\d+)(\\D)', s)). ")
+
+
+def lint_fix(spec, code):
+    """Rule Lawyer autofix (v3.6.1): the task text says 'truncating toward zero' but the code uses //,
+    which floors. Rewrite a // b as int(a / b). Only fires when the task itself states that rule."""
+    if "truncat" not in spec.lower() or "//" not in code:
+        return code
+    return re.sub(r"([\w\]\)]+)\s*//\s*([\w\[\(]+)", r"int(\1 / \2)", code)
 
 
 def solve(spec, tests, model, asker=ask, style="plain"):
@@ -281,7 +290,7 @@ def genius_code(spec, model, asker, lister=None):
        for 2 fresh drafts plus up to 2 sealed self-repairs."""
     strong = strong_model(model, lister)
     judge = strong or model
-    drafts = [extract(asker(STYLES[s] + spec, model)) for s in ("plain", "expert", "steps", "algo", "lawyer")]
+    drafts = [lint_fix(spec, extract(asker(STYLES[s] + spec, model))) for s in ("plain", "expert", "steps", "algo", "lawyer")]
     edges, mine = hunt_tests(spec, judge, asker)
     mine = sane(mine, drafts) + probes(spec)
     hint = ("\nEdge cases to handle:\n" + edges + "\n") if edges else ""
@@ -290,15 +299,15 @@ def genius_code(spec, model, asker, lister=None):
         return best
     coder = strong or model
     if strong:
-        drafts += [extract(asker(STYLES[s] + spec + hint, strong)) for s in ("expert", "algo", "lawyer")]
+        drafts += [lint_fix(spec, extract(asker(STYLES[s] + spec + hint, strong))) for s in ("expert", "algo", "lawyer")]
         best, n = pick(drafts, mine)
     for _ in range(2):
         if not mine or n == len(mine):
             break
         fail = self_score(best, mine)[1]
-        fixed = extract(asker(STYLES["plain"] + spec + hint + f"\nThis attempt fails this check:\n{fail}\n"
+        fixed = lint_fix(spec, extract(asker(STYLES["plain"] + spec + hint + "\n" + PITFALLS + f"\nThis attempt fails this check:\n{fail}\n"
                               "If the check itself contradicts the task, keep the code correct for the task.\n"
-                              f"Attempt:\n{best}", coder))
+                              f"Attempt:\n{best}", coder)))
         m = self_score(fixed, mine)[0]
         if m >= n:
             best, n = fixed, m
@@ -531,6 +540,8 @@ def selftest():
         "assert decode(encode('aaab'))=='aaab'" in rl and any("a" * 13 in x for x in rl))
     chk("Stress Probe: correct reference answers pass every probe",
         all(check(REF[t[0]], "\n".join(probes(t[2])))[0] for t in TASKS + HARD))
+    chk("lint_fix turns // into int(a / b) only when the task says truncate",
+        "int(a / b)" in lint_fix(HARD[0][2], "x = a // b") and lint_fix(TASKS[0][2], "x = a // b") == "x = a // b")
     chk("Stress Probe: no probes for two-argument functions", probes(TASKS[9][2]) == [])
     LAST.clear()
     print(f"\nSELFTEST: {'ALL PASSED' if not fails else str(fails) + ' FAILED'}")
