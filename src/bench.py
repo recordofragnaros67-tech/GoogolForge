@@ -281,6 +281,39 @@ def sane(asserts, drafts):
     return keep
 
 
+def fingerprint(code, asserts):
+    """What a draft actually returns on the inputs of the AI's own tests (no expected values used)."""
+    calls = []
+    for a in asserts:
+        try:
+            t = ast.parse(a).body[0].test
+        except (SyntaxError, IndexError, AttributeError):
+            continue
+        if isinstance(t, ast.Compare):
+            calls.append(ast.get_source_segment(a, t.left))
+    if not calls:
+        return None
+    body = "".join(f"try:\n    _o.append(repr({c}))\nexcept Exception as _e:\n    _o.append(type(_e).__name__)\n" for c in calls)
+    with tempfile.TemporaryDirectory() as d:
+        f = pathlib.Path(d) / "fp.py"
+        f.write_text(code + "\n_o = []\n" + body + "print('FP' + repr(_o))\n")
+        try:
+            r = subprocess.run([sys.executable, "-B", str(f)], capture_output=True, text=True,
+                               timeout=15, stdin=subprocess.DEVNULL, cwd=d)
+        except subprocess.TimeoutExpired:
+            return "timeout"
+    out = [ln for ln in r.stdout.splitlines() if ln.startswith("FP")]
+    return out[-1] if out else "crash"
+
+
+def agreed(drafts, mine, best):
+    """Second opinion (v3.6.2): before trusting an early win, at least two drafts that pass every
+    self-test must behave identically. A lone passer may only agree with a weak test."""
+    passers = [c for c in drafts if all(check(c, a)[0] for a in mine)]
+    fb = fingerprint(best, mine)
+    return fb is not None and sum(fingerprint(c, mine) == fb for c in passers) >= 2
+
+
 def genius_code(spec, model, asker, lister=None):
     """Genius style (v3.6, Edge-Case Hunter + Rule Lawyer + Stress Probe): Fischer-style preparation.
     1) 4 different opening drafts from the fast model (plain, expert, steps, algo).
@@ -295,7 +328,7 @@ def genius_code(spec, model, asker, lister=None):
     mine = sane(mine, drafts) + probes(spec)
     hint = ("\nEdge cases to handle:\n" + edges + "\n") if edges else ""
     best, n = pick(drafts, mine)
-    if mine and n == len(mine):
+    if mine and n == len(mine) and agreed(drafts, mine, best):
         return best
     coder = strong or model
     if strong:
@@ -540,6 +573,10 @@ def selftest():
         "assert decode(encode('aaab'))=='aaab'" in rl and any("a" * 13 in x for x in rl))
     chk("Stress Probe: correct reference answers pass every probe",
         all(check(REF[t[0]], "\n".join(probes(t[2])))[0] for t in TASKS + HARD))
+    rev = extract(answers["reverse"])
+    chk("second opinion: two identical passers agree, a lone passer does not",
+        agreed([rev, rev], ["assert reverse_words('a b')=='b a'"], rev)
+        and not agreed([rev, "def reverse_words(s):\n    return s\n"], ["assert reverse_words('a b')=='b a'"], rev))
     chk("lint_fix turns // into int(a / b) only when the task says truncate",
         "int(a / b)" in lint_fix(HARD[0][2], "x = a // b") and lint_fix(TASKS[0][2], "x = a // b") == "x = a // b")
     chk("Stress Probe: no probes for two-argument functions", probes(TASKS[9][2]) == [])
