@@ -76,5 +76,18 @@
     "score": 83,
     "seconds": 1359,
     "machine": "GitHub Actions (ubuntu-latest, CPU)"
+  },
+  {
+    "date": "2026-11-25T21:16",
+    "model": "qwen2.5-coder:1.5b + qwen2.5-coder:7b",
+    "style": "genius",
+    "hard": true,
+    "quick": false,
+    "tasks": 6,
+    "solved": 4,
+    "first_try": 4,
+    "score": 67,
+    "seconds": 870,
+    "machine": "GitHub Actions (ubuntu-latest, CPU)"
   }
 ]
