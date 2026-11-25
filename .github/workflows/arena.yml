@@ -44,7 +44,8 @@ jobs:
           FLAGS="--${{ inputs.style }}"
           case "${{ inputs.set }}" in hard) FLAGS="$FLAGS --hard";; quick) FLAGS="$FLAGS --quick";; esac
           python -B src/bench.py $FLAGS | tee arena.txt
-          python -B src/bench.py losses > losses.txt
+          python -B src/bench.py losses | tee losses.txt
+          { echo "### Wrong answers (for diagnosis)"; echo "```"; cat losses.txt; echo "```"; } >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"; cat arena.txt >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
       - name: Publish scores to the website
         run: |
