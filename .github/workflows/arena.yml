@@ -10,6 +10,12 @@ on:
       set:
         description: "hard, quick or full"
         default: "hard"
+      coder:
+        description: "fast coder model"
+        default: "qwen2.5-coder:1.5b"
+      strong:
+        description: "strong model the Smart Router escalates to (try qwen2.5-coder:7b)"
+        default: "qwen2.5-coder:3b"
 permissions:
   contents: write
 jobs:
@@ -28,16 +34,17 @@ jobs:
           curl -fsSL https://ollama.com/install.sh | sh
           (ollama serve > ollama.log 2>&1 &)
           for i in $(seq 1 30); do curl -s http://127.0.0.1:11434/api/tags >/dev/null && break; sleep 2; done
-          ollama pull qwen2.5-coder:1.5b
-          ollama pull qwen2.5-coder:3b
+          ollama pull "${{ inputs.coder }}"
+          ollama pull "${{ inputs.strong }}"
           ollama pull llama3.2:1b
           mkdir -p "$GF_HOME"
-          echo '{"coder":"qwen2.5-coder:1.5b","judge":"llama3.2:1b","strong":"qwen2.5-coder:3b","threads":4}' > "$GF_HOME/config.json"
+          printf '{"coder":"%s","judge":"llama3.2:1b","strong":"%s","threads":4}' "${{ inputs.coder }}" "${{ inputs.strong }}" > "$GF_HOME/config.json"
       - name: Run the Arena
         run: |
           FLAGS="--${{ inputs.style }}"
           case "${{ inputs.set }}" in hard) FLAGS="$FLAGS --hard";; quick) FLAGS="$FLAGS --quick";; esac
           python -B src/bench.py $FLAGS | tee arena.txt
+          python -B src/bench.py losses > losses.txt
           echo '```' >> "$GITHUB_STEP_SUMMARY"; cat arena.txt >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
       - name: Publish scores to the website
         run: |
@@ -45,6 +52,7 @@ jobs:
           import json, os, pathlib
           h = json.loads(pathlib.Path(os.environ["GF_HOME"], "bench_history.json").read_text())[-1]
           h["machine"] = "GitHub Actions (ubuntu-latest, CPU)"
+          h["model"] = h["model"] + " + " + "${{ inputs.strong }}"
           p = pathlib.Path("docs/scores.json")
           allr = json.loads(p.read_text()) if p.exists() else []
           allr.append({k: h[k] for k in ("date","model","style","hard","quick","tasks","solved","first_try","score","seconds","machine")})
@@ -61,5 +69,6 @@ jobs:
           name: arena-results
           path: |
             arena.txt
+            losses.txt
             ollama.log
             gfhome/bench_history.json

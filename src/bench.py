@@ -8,6 +8,7 @@ sys.dont_write_bytecode = True
 
 HOME = pathlib.Path(os.environ.get("GF_HOME", str(pathlib.Path.home() / "googolforge")))
 HIST = HOME / "bench_history.json"
+LOSSES = HOME / "losses"
 CONF = HOME / "config.json"
 NOPROXY = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
@@ -97,6 +98,9 @@ STYLES = {
     "plain":  "Write ONLY the Python code for this. " + RULES,
     "expert": ("You are a senior Python engineer. Handle edge cases (empty input, single item, "
                "duplicates, boundaries). Write ONLY the code. " + RULES),
+    "lawyer": ("Read the task like a lawyer: obey every exact rule word for word. Python pitfalls: // floors toward "
+               "minus infinity (use int(a / b) to truncate toward zero); '-7' is a negative number token; numbers "
+               "and counts can have several digits; empty input gives an empty result. Write ONLY the code. " + RULES),
     "steps":  ("First list the edge cases in at most 3 short # comments, then write the code. " + RULES),
     "elite":  ("Write ONLY the Python code for this. " + RULES),
     "algo":   ("First name the classic algorithm or data structure that solves this in one # comment, "
@@ -106,16 +110,23 @@ STYLES = {
 CANDIDATES = ["qwen2.5-coder:1.5b", "qwen2.5-coder:3b", "llama3.2:1b", "llama3.2:3b", "deepseek-coder:1.3b"]
 
 
+LAST = {}  # the final answer and error of the last task, kept for the loss log (never shown to the model)
+PITFALLS = ("Python pitfalls to check: // floors toward minus infinity (use int(a / b) to truncate toward zero); "
+            "a token like '-7' is a negative number, not an operator; counts and numbers can have several digits; "
+            "empty input must return an empty result; a single item is a valid input. ")
+
+
 def solve(spec, tests, model, asker=ask, style="plain"):
     prompt = STYLES.get(style, STYLES["plain"]) + spec
     if style == "team":  # a second model acts as Tester and lists edge cases first
         cases = asker("You are the Tester. List the 3 trickiest edge cases for this task, one short line each, "
                       "no code.\n" + spec, C.get("judge", model))
         prompt += "\nTester's edge cases:\n" + (cases or "")[:600]
-    if style == "elite":
-        return 1 if check(elite_code(spec, model, asker), tests)[0] else 0
-    if style == "genius":
-        return 1 if check(genius_code(spec, model, asker), tests)[0] else 0
+    if style in ("elite", "genius"):
+        code = (elite_code if style == "elite" else genius_code)(spec, model, asker)
+        ok, err = check(code, tests)
+        LAST.update(code=code, err=err)
+        return 1 if ok else 0
     code = extract(asker(prompt, model))
     ok, err = check(code, tests)
     if ok:
@@ -207,7 +218,7 @@ def hunt_tests(spec, model, asker):
                 "(think: empty input, single item, negative numbers, zero, multi-digit counts, ties, cycles, "
                 "unreachable, boundaries). Then write 8 Python assert statements: 3 normal cases and at least "
                 "one for each edge case. Work out every expected value by hand, following the task's exact "
-                "rules. If the task has two functions that undo each other, add round-trip asserts like "
+                "rules. " + PITFALLS + "If the task has two functions that undo each other, add round-trip asserts like "
                 "assert g(f(x)) == x. Use exactly the function names in the task. Reply with only the "
                 "# comments and the asserts, one per line.\n" + spec, model) or ""
     edges = [ln.strip() for ln in raw.splitlines() if ln.strip().startswith("#")][:6]
@@ -237,7 +248,7 @@ def sane(asserts, drafts):
 
 
 def genius_code(spec, model, asker, lister=None):
-    """Genius style (v3.4, Edge-Case Hunter): Fischer-style preparation.
+    """Genius style (v3.5, Edge-Case Hunter + Rule Lawyer): Fischer-style preparation.
     1) 4 different opening drafts from the fast model (plain, expert, steps, algo).
     2) Spec tests written by the strongest model available (never sees hidden tests).
     3) CodeT choice: most self-tests passed, ties broken by agreement between drafts.
@@ -245,7 +256,7 @@ def genius_code(spec, model, asker, lister=None):
        for 2 fresh drafts plus up to 2 sealed self-repairs."""
     strong = strong_model(model, lister)
     judge = strong or model
-    drafts = [extract(asker(STYLES[s] + spec, model)) for s in ("plain", "expert", "steps", "algo")]
+    drafts = [extract(asker(STYLES[s] + spec, model)) for s in ("plain", "expert", "steps", "algo", "lawyer")]
     edges, mine = hunt_tests(spec, judge, asker)
     mine = sane(mine, drafts)
     hint = ("\nEdge cases to handle:\n" + edges + "\n") if edges else ""
@@ -254,7 +265,7 @@ def genius_code(spec, model, asker, lister=None):
         return best
     coder = strong or model
     if strong:
-        drafts += [extract(asker(STYLES[s] + spec + hint, strong)) for s in ("expert", "algo")]
+        drafts += [extract(asker(STYLES[s] + spec + hint, strong)) for s in ("expert", "algo", "lawyer")]
         best, n = pick(drafts, mine)
     for _ in range(2):
         if not mine or n == len(mine):
@@ -289,6 +300,11 @@ def run(model=None, quick=False, asker=ask, style="plain", quiet=False, hard=Fal
         mark = {1: "WIN  (1st try)", 2: "WIN  (after fix)", 0: "LOSS"}[res]
         say(f"  L{lvl} {name:<16} {mark:<17} {time.time() - s:5.1f}s")
         rows.append({"task": name, "result": res})
+        if res == 0 and LAST:
+            LOSSES.mkdir(parents=True, exist_ok=True)
+            (LOSSES / f"{name}.txt").write_text(f"# TASK\n# {spec}\n\n{LAST.get('code', '')}\n\n# ERROR\n"
+                                                + "\n".join("# " + x for x in LAST.get("err", "").splitlines()[-12:]))
+        LAST.clear()
     n = len(tasks)
     score = round(100 * (first + 0.5 * (second - first)) / n)
     result = {"date": datetime.datetime.now().isoformat(timespec="minutes"), "model": model,
@@ -474,6 +490,16 @@ def selftest():
         == ("# empty string\n# one word", ["assert reverse_words('')==''", "assert reverse_words('a b')=='b a'"]))
     chk("sane() drops a test with the wrong function name",
         sane(["assert nope(1)==1", "assert reverse_words('a b')=='b a'"], [good]) == ["assert reverse_words('a b')=='b a'"])
+    LAST.update(code="x=1", err="")
+    chk("Rule Lawyer style exists and names the truncation pitfall", "int(a / b)" in STYLES["lawyer"])
+    def fake_hunt(prompt, model):
+        if "tough exam setter" in prompt:
+            return "assert reverse_words('a b')=='b a'"
+        return "```python\ndef reverse_words(s):\n    return s\n```"
+    LAST.clear()
+    solve(TASKS[0][2], TASKS[0][3], "m", fake_hunt, "genius")
+    chk("loss log keeps the final wrong answer and its error", "return s" in LAST.get("code", "") and LAST.get("err"))
+    LAST.clear()
     print(f"\nSELFTEST: {'ALL PASSED' if not fails else str(fails) + ' FAILED'}")
     return fails == 0
 
@@ -513,7 +539,16 @@ if __name__ == "__main__":
                      tuple(STYLES) if "--prompts" in b else ("plain",), "--apply" in b)
     elif a[:1] == ["history"]:
         history()
+    elif a[:1] == ["losses"]:  # show the last wrong answers so you can see the exact bug
+        fs = sorted(LOSSES.glob("*.txt")) if LOSSES.exists() else []
+        print("\n\n".join(f"===== {f.stem} =====\n{f.read_text()}" for f in fs) or "No losses saved. Run: forge bench --genius --hard")
     else:
+        for x in a:
+            if x.startswith("--strong="):
+                C["strong"] = x.split("=", 1)[1]
+        if LOSSES.exists():
+            for f in LOSSES.glob("*.txt"):
+                f.unlink()
         rest = [x for x in a if not x.startswith("--")]
         style = "genius" if "--genius" in a else "elite" if "--elite" in a else "team" if "--team" in a else "plain"
         run(rest[0] if rest else None, "--quick" in a, style=style, hard="--hard" in a)
