@@ -62,7 +62,15 @@ ol li{margin-bottom:8px}footer{padding:32px 0;color:var(--mut);font-size:.9rem;b
 <tr><td>Standard (10 tasks)</td><td>80</td><td class="big">90</td></tr>
 <tr><td>Hard (6 tasks)</td><td>17</td><td class="big">50</td></tr>
 </table>
-<p class="note">Sealed judge, qwen2.5-coder:1.5b, ARM64 test machine. Pixel 8 results will be added after the first on-device run. Scores are never inflated.</p>
+<p class="note">Sealed judge, qwen2.5-coder:1.5b, ARM64 test machine. Scores are never inflated.</p>
+<h3>Genius mode, Hard set (GitHub Actions CPU, not a Pixel)</h3>
+<table>
+<tr><th>Models (fast + strong)</th><th>Solved</th><th>Score</th><th>Time</th></tr>
+<tr><td>1.5B + 3B (v3.3)</td><td>4/6</td><td>67</td><td>420s</td></tr>
+<tr><td>1.5B + 3B (v3.5)</td><td>4/6</td><td>67</td><td>631s</td></tr>
+<tr><td>1.5B + 7B (v3.5)</td><td>5/6</td><td class="big">83</td><td>1462s</td></tr>
+</table>
+<p class="note">Every arena run is logged in <a href="scores.json">scores.json</a>. Pixel 8 results will be added after the first on-device run.</p>
 </div></section>
 
 <section><div class="wrap">

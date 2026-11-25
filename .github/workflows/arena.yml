@@ -54,16 +54,27 @@ jobs:
           h = json.loads(pathlib.Path(os.environ["GF_HOME"], "bench_history.json").read_text())[-1]
           h["machine"] = "GitHub Actions (ubuntu-latest, CPU)"
           h["model"] = h["model"] + " + " + "${{ inputs.strong }}"
-          p = pathlib.Path("docs/scores.json")
-          allr = json.loads(p.read_text()) if p.exists() else []
-          allr.append({k: h[k] for k in ("date","model","style","hard","quick","tasks","solved","first_try","score","seconds","machine")})
-          p.write_text(json.dumps(allr[-50:], indent=2))
+          keep = ("date","model","style","hard","quick","tasks","solved","first_try","score","seconds","machine")
+          pathlib.Path("entry.json").write_text(json.dumps({k: h[k] for k in keep}))
           PY
           git config user.name "gf-arena-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/scores.json
-          git commit -m "Arena score: ${{ inputs.style }} ${{ inputs.set }}" || exit 0
-          git pull --rebase -q && git push
+          # Retry loop: other arena runs may publish at the same time.
+          for i in 1 2 3 4 5; do
+            git fetch -q origin main && git reset -q --hard origin/main
+            python - <<'PY'
+          import json, pathlib
+          p = pathlib.Path("docs/scores.json")
+          allr = json.loads(p.read_text()) if p.exists() else []
+          allr.append(json.loads(pathlib.Path("entry.json").read_text()))
+          p.write_text(json.dumps(allr[-50:], indent=2))
+          PY
+            git add docs/scores.json
+            git commit -q -m "Arena score: ${{ inputs.style }} ${{ inputs.set }}" || exit 0
+            git push -q origin HEAD:main && exit 0
+            sleep $((i * 5))
+          done
+          exit 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
