@@ -55,5 +55,8 @@ Website: `docs/` (GitHub Pages). Contributing: see `CONTRIBUTING.md`.
 Every model call now sends `num_thread` (default **5**, the reported sweet spot for the Pixel 8's Tensor G3; more threads can slow it down).
 To try another value, add `"threads": 4` (or 6) to `~/googolforge/config.json`, then compare with `forge bench --quick`.
 
-## Genius mode (v3.3): Smart Router
+## Genius mode (v3.4): Smart Router + Edge-Case Hunter
+
+The strongest model now acts like a tough exam setter: it lists the trickiest edge cases (empty input, negatives, multi-digit counts, round trips), writes tests for them from the task text only, and the coders must pass them. Broken tests with wrong function names are thrown out.
+
 `forge bench --genius --hard` uses four different opening drafts from the fast 1.5B model. The strongest installed model writes spec tests without ever seeing the hidden tests, and the drafts are scored CodeT-style. A task escalates to `qwen2.5-coder:3b` only when every draft still fails its own tests. Easy tasks stay fast. Models stay loaded for 30 minutes (`"keep_alive"` in config.json). Set `"strong"` in config.json to choose a different escalation model.

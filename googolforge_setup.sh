@@ -2290,8 +2290,45 @@ def pick(drafts, mine):
     return best[1], best[0][0]
 
 
+def hunt_tests(spec, model, asker):
+    """Edge-Case Hunter (v3.4): the strongest model thinks like a tough examiner. It lists the trickiest
+    edge cases as # comments, then writes asserts for normal AND edge cases from the task text only
+    (the hidden tests stay sealed). Returns (edge_notes, asserts)."""
+    raw = asker("You are a tough exam setter. First list the 4 trickiest edge cases of this task as # comments "
+                "(think: empty input, single item, negative numbers, zero, multi-digit counts, ties, cycles, "
+                "unreachable, boundaries). Then write 8 Python assert statements: 3 normal cases and at least "
+                "one for each edge case. Work out every expected value by hand, following the task's exact "
+                "rules. If the task has two functions that undo each other, add round-trip asserts like "
+                "assert g(f(x)) == x. Use exactly the function names in the task. Reply with only the "
+                "# comments and the asserts, one per line.\n" + spec, model) or ""
+    edges = [ln.strip() for ln in raw.splitlines() if ln.strip().startswith("#")][:6]
+    out = []
+    for line in (extract(raw) + "\n" + raw).replace(", assert ", "\nassert ").splitlines():
+        line = line.strip().rstrip(",;")
+        if not line.startswith("assert"):
+            continue
+        try:
+            t = ast.parse(line)
+        except SyntaxError:
+            continue
+        if len(t.body) == 1 and isinstance(t.body[0], ast.Assert) and line not in out:
+            out.append(line)
+    return "\n".join(edges), out[:10]
+
+
+def sane(asserts, drafts):
+    """Drop a broken test: one that EVERY draft fails with NameError (wrong function name)."""
+    keep = []
+    for a in asserts:
+        errs = [check(c, a) for c in drafts]
+        if all((not ok) and "NameError" in (e or "") for ok, e in errs):
+            continue
+        keep.append(a)
+    return keep
+
+
 def genius_code(spec, model, asker, lister=None):
-    """Genius style (v3.3): Fischer-style preparation.
+    """Genius style (v3.4, Edge-Case Hunter): Fischer-style preparation.
     1) 4 different opening drafts from the fast model (plain, expert, steps, algo).
     2) Spec tests written by the strongest model available (never sees hidden tests).
     3) CodeT choice: most self-tests passed, ties broken by agreement between drafts.
@@ -2300,19 +2337,21 @@ def genius_code(spec, model, asker, lister=None):
     strong = strong_model(model, lister)
     judge = strong or model
     drafts = [extract(asker(STYLES[s] + spec, model)) for s in ("plain", "expert", "steps", "algo")]
-    mine = spec_tests(spec, judge, asker)
+    edges, mine = hunt_tests(spec, judge, asker)
+    mine = sane(mine, drafts)
+    hint = ("\nEdge cases to handle:\n" + edges + "\n") if edges else ""
     best, n = pick(drafts, mine)
     if mine and n == len(mine):
         return best
     coder = strong or model
     if strong:
-        drafts += [extract(asker(STYLES[s] + spec, strong)) for s in ("expert", "algo")]
+        drafts += [extract(asker(STYLES[s] + spec + hint, strong)) for s in ("expert", "algo")]
         best, n = pick(drafts, mine)
     for _ in range(2):
         if not mine or n == len(mine):
             break
         fail = self_score(best, mine)[1]
-        fixed = extract(asker(STYLES["plain"] + spec + f"\nThis attempt fails this check:\n{fail}\n"
+        fixed = extract(asker(STYLES["plain"] + spec + hint + f"\nThis attempt fails this check:\n{fail}\n"
                               "If the check itself contradicts the task, keep the code correct for the task.\n"
                               f"Attempt:\n{best}", coder))
         m = self_score(fixed, mine)[0]
@@ -2521,6 +2560,11 @@ def selftest():
     good, bad = extract(answers["reverse"]), "def reverse_words(s):\n    return s\n"
     chk("pick prefers the draft that passes more of its own tests",
         pick([bad, good, bad], ["assert reverse_words('a b')=='b a'"])[0] == good)
+    chk("hunter reads edge notes and asserts from one answer",
+        hunt_tests("t", "m", lambda p, m: "# empty string\n# one word\nassert reverse_words('')==''\nassert reverse_words('a b')=='b a'")
+        == ("# empty string\n# one word", ["assert reverse_words('')==''", "assert reverse_words('a b')=='b a'"]))
+    chk("sane() drops a test with the wrong function name",
+        sane(["assert nope(1)==1", "assert reverse_words('a b')=='b a'"], [good]) == ["assert reverse_words('a b')=='b a'"])
     print(f"\nSELFTEST: {'ALL PASSED' if not fails else str(fails) + ' FAILED'}")
     return fails == 0
 
