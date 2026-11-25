@@ -236,6 +236,31 @@ def hunt_tests(spec, model, asker):
     return "\n".join(edges), out[:10]
 
 
+def probes(spec):
+    """Stress Probe (v3.6): property checks built ONLY from the task text, with no answer key.
+    1) The task says integers/numbers: the task's own example with its first number made negative
+       must not crash. 2) Two functions that undo each other: g(f(x)) == x on the task's letter
+       examples, also stretched past 9 repeats. Like property-based testing."""
+    sigs = re.findall(r"def (\w+)\(([^)]*)\)", spec)
+    if not sigs:
+        return []
+    low, out = spec.lower(), []
+    lits = re.findall(r"'([^'\n]{1,40})'", spec)
+    one_arg = [n for n, a in sigs if a.strip() and "," not in a]
+    if len(sigs) == 1 and one_arg and ("integer" in low or "number" in low):
+        for x in lits:
+            if re.search(r"\d", x) and " " in x:
+                y = re.sub(r"(?<![\w-])(\d+)", r"-\1", x, count=1)
+                out.append(f"assert ({one_arg[0]}({y!r}), True)[1]")
+    if len(one_arg) >= 2 and any(w in low for w in ("reverse", "<->", "undo", "inverse", "round trip")):
+        f, g = one_arg[0], one_arg[1]
+        for x in lits:
+            if x.isalpha():
+                for v in (x, x[0] * 12 + x):
+                    out.append(f"assert {g}({f}({v!r}))=={v!r}")
+    return out[:6]
+
+
 def sane(asserts, drafts):
     """Drop a broken test: one that EVERY draft fails with NameError (wrong function name)."""
     keep = []
@@ -248,7 +273,7 @@ def sane(asserts, drafts):
 
 
 def genius_code(spec, model, asker, lister=None):
-    """Genius style (v3.5, Edge-Case Hunter + Rule Lawyer): Fischer-style preparation.
+    """Genius style (v3.6, Edge-Case Hunter + Rule Lawyer + Stress Probe): Fischer-style preparation.
     1) 4 different opening drafts from the fast model (plain, expert, steps, algo).
     2) Spec tests written by the strongest model available (never sees hidden tests).
     3) CodeT choice: most self-tests passed, ties broken by agreement between drafts.
@@ -258,7 +283,7 @@ def genius_code(spec, model, asker, lister=None):
     judge = strong or model
     drafts = [extract(asker(STYLES[s] + spec, model)) for s in ("plain", "expert", "steps", "algo", "lawyer")]
     edges, mine = hunt_tests(spec, judge, asker)
-    mine = sane(mine, drafts)
+    mine = sane(mine, drafts) + probes(spec)
     hint = ("\nEdge cases to handle:\n" + edges + "\n") if edges else ""
     best, n = pick(drafts, mine)
     if mine and n == len(mine):
@@ -499,6 +524,14 @@ def selftest():
     LAST.clear()
     solve(TASKS[0][2], TASKS[0][3], "m", fake_hunt, "genius")
     chk("loss log keeps the final wrong answer and its error", "return s" in LAST.get("code", "") and LAST.get("err"))
+    chk("Stress Probe: negative-number probe from the task's own example",
+        probes(HARD[0][2]) == ["assert (rpn('-3 4 + 2 *'), True)[1]"])
+    rl = probes(HARD[2][2])
+    chk("Stress Probe: round trip plus a run longer than 9",
+        "assert decode(encode('aaab'))=='aaab'" in rl and any("a" * 13 in x for x in rl))
+    chk("Stress Probe: correct reference answers pass every probe",
+        all(check(REF[t[0]], "\n".join(probes(t[2])))[0] for t in TASKS + HARD))
+    chk("Stress Probe: no probes for two-argument functions", probes(TASKS[9][2]) == [])
     LAST.clear()
     print(f"\nSELFTEST: {'ALL PASSED' if not fails else str(fails) + ' FAILED'}")
     return fails == 0

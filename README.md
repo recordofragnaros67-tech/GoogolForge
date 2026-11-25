@@ -55,9 +55,11 @@ Website: `docs/` (GitHub Pages). Contributing: see `CONTRIBUTING.md`.
 Every model call now sends `num_thread` (default **5**, the reported sweet spot for the Pixel 8's Tensor G3; more threads can slow it down).
 To try another value, add `"threads": 4` (or 6) to `~/googolforge/config.json`, then compare with `forge bench --quick`.
 
-## Genius mode (v3.5): Smart Router + Edge-Case Hunter + Rule Lawyer
+## Genius mode (v3.6): Smart Router + Edge-Case Hunter + Rule Lawyer + Stress Probe
 
 v3.5 adds a Rule Lawyer draft (obeys exact rules, knows Python pitfalls like // flooring), a loss log (`forge bench losses` shows the exact wrong answer after a run), and `--strong=MODEL` to escalate to a bigger model such as qwen2.5-coder:7b.
+
+v3.6 adds a Stress Probe: property checks built only from the task text (a negative version of the task's own example must not crash; functions that undo each other must round-trip, including runs longer than 9). No answer key, no hidden tests.
 
 
 The strongest model now acts like a tough exam setter: it lists the trickiest edge cases (empty input, negatives, multi-digit counts, round trips), writes tests for them from the task text only, and the coders must pass them. Broken tests with wrong function names are thrown out.
