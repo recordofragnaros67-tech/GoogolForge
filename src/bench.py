@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""GoogolForge Benchmark Arena v1.4 (Genius style with Smart Router, Elite style, sealed hidden tests, Shootout, Hard mode, Team style) - turn "quality" into a number.
+"""GoogolForge Benchmark Arena v1.5 (HumanEval+ slice, Genius style with Smart Router, Elite style, sealed hidden tests, Shootout, Hard mode, Team style) - turn "quality" into a number.
 Ten fixed coding tasks with hidden tests. The coder model gets two tries per task
 (the second sees the error, like the real engine). Scores are saved so every
 model, prompt or version change is measured against the last one."""
@@ -80,13 +80,16 @@ def extract(text):
     return (max(m, key=len) if m else text or "").strip() + "\n"
 
 
+PREFIX = {"code": ""}  # HumanEval+ tasks: the task's own signature, imports and helpers go first
+
+
 def check(code, tests):
     with tempfile.TemporaryDirectory() as d:
         f = pathlib.Path(d) / "t.py"
-        f.write_text(code + "\n" + tests + "\nprint('BENCH_OK')\n")
+        f.write_text(PREFIX["code"] + "\n" + code + "\n" + tests + "\nprint('BENCH_OK')\n")
         try:
             r = subprocess.run([sys.executable, "-B", str(f)], capture_output=True, text=True,
-                               timeout=15, stdin=subprocess.DEVNULL, cwd=d)
+                               timeout=30 if PREFIX["code"] else 15, stdin=subprocess.DEVNULL, cwd=d)
         except subprocess.TimeoutExpired:
             return False, "timed out"
         return "BENCH_OK" in r.stdout, (r.stderr or r.stdout)[-600:]
@@ -370,21 +373,73 @@ def genius_code(spec, model, asker, lister=None):
     return best
 
 
-def run(model=None, quick=False, asker=ask, style="plain", quiet=False, hard=False):
+# ---- HumanEval+ slice (v3.7) ------------------------------------------------------------
+# 40 fixed tasks from EvalPlus HumanEval+ v0.1.10 (Apache-2.0, github.com/evalplus/humanevalplus_release):
+# every 4th task, up to 120 hidden inputs each, expected outputs from the canonical solutions.
+# Built by tools/build_heplus.py. The model sees only the function signature and docstring.
+HEP_URL = "https://raw.githubusercontent.com/recordofragnaros67-tech/GoogolForge/main/data/heplus40.json"
+
+
+def he_data():
+    here = pathlib.Path(__file__).resolve().parent.parent / "data" / "heplus40.json"
+    mine = HOME / "data" / "heplus40.json"
+    if here.exists():
+        return json.loads(here.read_text())
+    if not mine.exists():
+        print("Downloading the HumanEval+ slice (about 400 KB)...")
+        mine.parent.mkdir(parents=True, exist_ok=True)
+        with urllib.request.urlopen(HEP_URL, timeout=60) as r:
+            mine.write_bytes(r.read())
+    return json.loads(mine.read_text())
+
+
+def he_tests(t):
+    """Sealed hidden tests for one HumanEval+ task. A failure says only which case number failed."""
+    cases = ",\n".join(f"({i}, {o})" for i, o in t["cases"])
+    atol = t.get("atol") or 0
+    root = t["entry"] == "find_zero"  # any real root counts, as in EvalPlus
+    return (f"import copy as _cp, math as _m\n_CASES = [\n{cases}\n]\n"
+            f"def _same(a, b):\n"
+            f"    if isinstance(a, float) or isinstance(b, float):\n"
+            f"        try:\n            return _m.isclose(a, b, rel_tol=1e-6, abs_tol={max(atol, 1e-9)!r}) or (a != a and b != b)\n"
+            f"        except TypeError:\n            return False\n"
+            f"    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):\n"
+            f"        return type(a) == type(b) and len(a) == len(b) and all(_same(x, y) for x, y in zip(a, b))\n"
+            f"    return a == b\n"
+            f"for _n, (_i, _o) in enumerate(_CASES):\n"
+            f"    _r = {t['entry']}(*_cp.deepcopy(_i))\n"
+            + ("    assert abs(poly(_i[0], _r)) < 1e-4, f'wrong answer on hidden case {_n}'\n" if root else
+               "    assert _same(_r, _o), f'wrong answer on hidden case {_n}'\n"))
+
+
+def he_tasks():
+    d = he_data()
+    return [(t["id"].replace("HumanEval/", "he_") + "_" + t["entry"], 3,
+             "Complete this Python function. Keep the exact name and signature:\n" + t["prompt"],
+             he_tests(t), t["prompt"]) for t in d["tasks"]]
+
+
+def run(model=None, quick=False, asker=ask, style="plain", quiet=False, hard=False, suite="arena"):
     model = model or C["coder"]
-    tasks = HARD if hard else (TASKS[:4] if quick else TASKS)
+    if suite == "heplus":
+        tasks = he_tasks()[:8] if quick else he_tasks()
+    else:
+        tasks = HARD if hard else (TASKS[:4] if quick else TASKS)
     say = (lambda *a, **k: None) if quiet else print
     say(f"BENCHMARK ARENA  model={model}  style={style}  tasks={len(tasks)}\n")
     first = second = 0
     t0 = time.time()
     rows = []
-    for name, lvl, spec, tests in tasks:
+    for name, lvl, spec, tests, *pre in tasks:
         s = time.time()
+        PREFIX["code"] = pre[0] if pre else ""
         try:
             res = solve(spec, tests, model, asker, style)
         except Exception as e:
             say(f"AI call failed ({e}). Start it with: forge-start")
             return None
+        finally:
+            PREFIX["code"] = ""
         first += res == 1
         second += res in (1, 2)
         mark = {1: "WIN  (1st try)", 2: "WIN  (after fix)", 0: "LOSS"}[res]
@@ -399,9 +454,10 @@ def run(model=None, quick=False, asker=ask, style="plain", quiet=False, hard=Fal
     score = round(100 * (first + 0.5 * (second - first)) / n)
     result = {"date": datetime.datetime.now().isoformat(timespec="minutes"), "model": model,
               "tasks": n, "first_try": first, "solved": second, "score": score,
-              "seconds": round(time.time() - t0), "quick": quick, "hard": hard, "style": style, "rows": rows}
+              "seconds": round(time.time() - t0), "quick": quick, "hard": hard, "style": style, "suite": suite, "rows": rows}
     hist = json.loads(HIST.read_text()) if HIST.exists() else []
-    same = [h for h in hist if h["tasks"] == n and h["model"] == model and h.get("hard", False) == hard]
+    same = [h for h in hist if h["tasks"] == n and h["model"] == model and h.get("hard", False) == hard
+            and h.get("suite", "arena") == suite]
     best = max((h["score"] for h in same), default=None)
     hist.append(result)
     HOME.mkdir(parents=True, exist_ok=True)
@@ -607,6 +663,21 @@ def selftest():
     chk("lint_fix turns // into int(a / b) only when the task says truncate",
         "int(a / b)" in lint_fix(HARD[0][2], "x = a // b") and lint_fix(TASKS[0][2], "x = a // b") == "x = a // b")
     chk("Stress Probe: no probes for two-argument functions", probes(TASKS[9][2]) == [])
+    hd = he_data()["tasks"]
+    chk("HumanEval+ slice: 40 tasks, each with hidden cases", len(hd) == 40 and all(len(t["cases"]) >= 4 for t in hd))
+    okref = True
+    for t in hd:  # every canonical solution passes its own hidden tests (proves the tests are fair)
+        PREFIX["code"] = t["prompt"]
+        okref = okref and check(t["prompt"] + t["ref"], he_tests(t))[0]
+    bad = hd[0]
+    PREFIX["code"] = bad["prompt"]
+    wrong = check(f"def {bad['entry']}(*a):\n    return False\n", he_tests(bad))
+    PREFIX["code"] = ""
+    chk("HumanEval+ slice: all 40 reference solutions pass", okref)
+    chk("HumanEval+ sealed judge: a wrong answer fails and names only the case number",
+        not wrong[0] and "hidden case" in wrong[1] and "[" not in wrong[1].split("hidden case")[-1])
+    chk("HumanEval+ prompt never contains the reference or the cases",
+        all(t["ref"].strip() not in he_tasks()[k][2] and he_tasks()[k][3] not in he_tasks()[k][2] for k, t in enumerate(hd[:5])))
     LAST.clear()
     print(f"\nSELFTEST: {'ALL PASSED' if not fails else str(fails) + ' FAILED'}")
     return fails == 0
@@ -659,4 +730,5 @@ if __name__ == "__main__":
                 f.unlink()
         rest = [x for x in a if not x.startswith("--")]
         style = "genius" if "--genius" in a else "elite" if "--elite" in a else "team" if "--team" in a else "plain"
-        run(rest[0] if rest else None, "--quick" in a, style=style, hard="--hard" in a)
+        run(rest[0] if rest else None, "--quick" in a, style=style, hard="--hard" in a,
+            suite="heplus" if "--heplus" in a else "arena")

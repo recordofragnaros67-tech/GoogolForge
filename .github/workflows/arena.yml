@@ -8,7 +8,7 @@ on:
         description: "genius, elite, team or plain"
         default: "genius"
       set:
-        description: "hard, quick or full"
+        description: "hard, quick, full, or heplus (40 HumanEval+ tasks)"
         default: "hard"
       coder:
         description: "fast coder model"
@@ -42,7 +42,7 @@ jobs:
       - name: Run the Arena
         run: |
           FLAGS="--${{ inputs.style }}"
-          case "${{ inputs.set }}" in hard) FLAGS="$FLAGS --hard";; quick) FLAGS="$FLAGS --quick";; esac
+          case "${{ inputs.set }}" in hard) FLAGS="$FLAGS --hard";; quick) FLAGS="$FLAGS --quick";; heplus) FLAGS="$FLAGS --heplus";; esac
           python -B src/bench.py $FLAGS | tee arena.txt
           python -B src/bench.py losses | tee losses.txt
           { echo '### Wrong answers (for diagnosis)'; echo '```'; cat losses.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
@@ -54,8 +54,8 @@ jobs:
           h = json.loads(pathlib.Path(os.environ["GF_HOME"], "bench_history.json").read_text())[-1]
           h["machine"] = "GitHub Actions (ubuntu-latest, CPU)"
           h["model"] = h["model"] + " + " + "${{ inputs.strong }}"
-          keep = ("date","model","style","hard","quick","tasks","solved","first_try","score","seconds","machine")
-          pathlib.Path("entry.json").write_text(json.dumps({k: h[k] for k in keep}))
+          keep = ("date","model","style","hard","quick","suite","tasks","solved","first_try","score","seconds","machine")
+          pathlib.Path("entry.json").write_text(json.dumps({k: h.get(k, "arena" if k == "suite" else None) for k in keep}))
           PY
           git config user.name "gf-arena-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

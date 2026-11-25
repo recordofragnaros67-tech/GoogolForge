@@ -1,0 +1,6 @@
+data/heplus40.json is derived from EvalPlus HumanEval+ v0.1.10
+https://github.com/evalplus/humanevalplus_release
+Copyright the EvalPlus authors. Licensed under the Apache License, Version 2.0:
+https://www.apache.org/licenses/LICENSE-2.0
+Changes: 40-task subset (every 4th task), at most 120 inputs per task, expected outputs
+computed from the canonical solutions by tools/build_heplus.py.

@@ -80,3 +80,9 @@ The strongest model now acts like a tough exam setter: it lists the trickiest ed
 curl -fsSL https://raw.githubusercontent.com/recordofragnaros67-tech/GoogolForge/main/scripts/genius_run.sh | bash
 ```
 It updates GoogolForge, picks the strongest model your free RAM allows (7B, 3B or 1.5B), runs the sealed Hard exam in Genius mode, shows the wrong answers, and saves a report.
+
+## HumanEval+ slice (v3.7)
+
+`forge bench --heplus` runs 40 fixed tasks from [EvalPlus HumanEval+](https://github.com/evalplus/humanevalplus_release) v0.1.10 (every 4th task, up to 120 hidden inputs each). The model only sees each function's signature and docstring; the sealed judge tells a retry only the error type. Use `--quick` for the first 8 tasks. In GitHub Actions: arena > Run workflow > set `heplus`.
+
+40 tasks instead of 6 means one lucky or unlucky task moves the score by 2.5 points, not 17. The data is in `data/heplus40.json` and is rebuilt with `tools/build_heplus.py`. HumanEval+ is by the EvalPlus authors, Apache-2.0 (see `data/NOTICE`).
