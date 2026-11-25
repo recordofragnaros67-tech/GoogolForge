@@ -1,0 +1,65 @@
+name: arena
+# Runs the Benchmark Arena with REAL AI models on GitHub's free servers.
+# Start it from the Actions tab: arena > Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      style:
+        description: "genius, elite, team or plain"
+        default: "genius"
+      set:
+        description: "hard, quick or full"
+        default: "hard"
+permissions:
+  contents: write
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      GF_HOME: ${{ github.workspace }}/gfhome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Ollama and models
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          (ollama serve > ollama.log 2>&1 &)
+          for i in $(seq 1 30); do curl -s http://127.0.0.1:11434/api/tags >/dev/null && break; sleep 2; done
+          ollama pull qwen2.5-coder:1.5b
+          ollama pull qwen2.5-coder:3b
+          ollama pull llama3.2:1b
+          mkdir -p "$GF_HOME"
+          echo '{"coder":"qwen2.5-coder:1.5b","judge":"llama3.2:1b","strong":"qwen2.5-coder:3b","threads":4}' > "$GF_HOME/config.json"
+      - name: Run the Arena
+        run: |
+          FLAGS="--${{ inputs.style }}"
+          case "${{ inputs.set }}" in hard) FLAGS="$FLAGS --hard";; quick) FLAGS="$FLAGS --quick";; esac
+          python -B src/bench.py $FLAGS | tee arena.txt
+          echo '```' >> "$GITHUB_STEP_SUMMARY"; cat arena.txt >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish scores to the website
+        run: |
+          python - <<'PY'
+          import json, os, pathlib
+          h = json.loads(pathlib.Path(os.environ["GF_HOME"], "bench_history.json").read_text())[-1]
+          h["machine"] = "GitHub Actions (ubuntu-latest, CPU)"
+          p = pathlib.Path("docs/scores.json")
+          allr = json.loads(p.read_text()) if p.exists() else []
+          allr.append({k: h[k] for k in ("date","model","style","hard","quick","tasks","solved","first_try","score","seconds","machine")})
+          p.write_text(json.dumps(allr[-50:], indent=2))
+          PY
+          git config user.name "gf-arena-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/scores.json
+          git commit -m "Arena score: ${{ inputs.style }} ${{ inputs.set }}" || exit 0
+          git pull --rebase -q && git push
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arena-results
+          path: |
+            arena.txt
+            ollama.log
+            gfhome/bench_history.json
