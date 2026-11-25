@@ -2189,9 +2189,8 @@ STYLES = {
     "plain":  "Write ONLY the Python code for this. " + RULES,
     "expert": ("You are a senior Python engineer. Handle edge cases (empty input, single item, "
                "duplicates, boundaries). Write ONLY the code. " + RULES),
-    "lawyer": ("Read the task like a lawyer: obey every exact rule word for word. Python pitfalls: // floors toward "
-               "minus infinity (use int(a / b) to truncate toward zero); '-7' is a negative number token; numbers "
-               "and counts can have several digits; empty input gives an empty result. Write ONLY the code. " + RULES),
+    "lawyer": ("Read the task like a lawyer: obey every exact rule and worked example word for word. "
+               "Write ONLY the code. " + RULES),
     "steps":  ("First list the edge cases in at most 3 short # comments, then write the code. " + RULES),
     "elite":  ("Write ONLY the Python code for this. " + RULES),
     "algo":   ("First name the classic algorithm or data structure that solves this in one # comment, "
@@ -2206,6 +2205,21 @@ PITFALLS = ("Python pitfalls to check: // floors toward minus infinity (use int(
             "a token like '-7' is a negative number, not an operator; counts and numbers can have several digits; "
             "empty input must return an empty result; a single item is a valid input; to read a count with "
             "several digits, collect consecutive digits (for example re.findall(r'(\\d+)(\\D)', s)). ")
+
+
+def pitfalls(spec):
+    """Only the Python pitfalls that matter for THIS task (v3.6.4). Generic advice for every task
+    made models invent rules, like rejecting negative numbers in a dependency graph."""
+    low, out = spec.lower(), []
+    if "truncat" in low or "division" in low:
+        out.append("// floors toward minus infinity; use int(a / b) to truncate toward zero")
+    if ("integer" in low or "number" in low) and re.search(r"'[^']*\d [^']*'", spec):
+        out.append("a token like '-7' is a negative number, not an operator")
+    if "more than 9" in low or "several digits" in low or ("count" in low and "encod" in low):
+        out.append("counts can have several digits: collect consecutive digits, e.g. re.findall(r'(\\d+)(\\D)', s)")
+    if re.search(r"'\s*<?->", spec):
+        out.append("the worked example in the task must hold exactly")
+    return ("Pitfalls for this task: " + "; ".join(out) + ". ") if out else ""
 
 
 def lint_fix(spec, code):
@@ -2318,7 +2332,7 @@ def hunt_tests(spec, model, asker):
                 "(think: empty input, single item, negative numbers, zero, multi-digit counts, ties, cycles, "
                 "unreachable, boundaries). Then write 8 Python assert statements: 3 normal cases and at least "
                 "one for each edge case. Work out every expected value by hand, following the task's exact "
-                "rules. " + PITFALLS + "If the task has two functions that undo each other, add round-trip asserts like "
+                "rules. " + pitfalls(spec) + "If the task has two functions that undo each other, add round-trip asserts like "
                 "assert g(f(x)) == x. Use exactly the function names in the task. Reply with only the "
                 "# comments and the asserts, one per line.\n" + spec, model) or ""
     edges = [ln.strip() for ln in raw.splitlines() if ln.strip().startswith("#")][:6]
@@ -2421,7 +2435,8 @@ def genius_code(spec, model, asker, lister=None):
        for 2 fresh drafts plus up to 2 sealed self-repairs."""
     strong = strong_model(model, lister)
     judge = strong or model
-    drafts = [lint_fix(spec, extract(asker(STYLES[s] + spec, model))) for s in ("plain", "expert", "steps", "algo", "lawyer")]
+    drafts = [lint_fix(spec, extract(asker(STYLES[s] + spec, model))) for s in ("plain", "expert", "steps", "algo")]
+    drafts.append(lint_fix(spec, extract(asker(STYLES["lawyer"] + pitfalls(spec) + spec, model))))
     edges, mine = hunt_tests(spec, judge, asker)
     mine = sane(mine, drafts) + probes(spec)
     hint = ("\nEdge cases to handle:\n" + edges + "\n") if edges else ""
@@ -2430,13 +2445,14 @@ def genius_code(spec, model, asker, lister=None):
         return best
     coder = strong or model
     if strong:
-        drafts += [lint_fix(spec, extract(asker(STYLES[s] + spec + hint, strong))) for s in ("expert", "algo", "lawyer")]
+        drafts += [lint_fix(spec, extract(asker(STYLES[s] + spec + hint, strong))) for s in ("expert", "algo")]
+        drafts.append(lint_fix(spec, extract(asker(STYLES["lawyer"] + pitfalls(spec) + spec + hint, strong))))
         best, n = pick(drafts, mine)
     for _ in range(2):
         if not mine or n == len(mine):
             break
         fail = self_score(best, mine)[1]
-        fixed = lint_fix(spec, extract(asker(STYLES["plain"] + spec + hint + "\n" + PITFALLS + f"\nThis attempt fails this check:\n{fail}\n"
+        fixed = lint_fix(spec, extract(asker(STYLES["plain"] + spec + hint + "\n" + pitfalls(spec) + f"\nThis attempt fails this check:\n{fail}\n"
                               "If the check itself contradicts the task, keep the code correct for the task.\n"
                               f"Attempt:\n{best}", coder)))
         m = self_score(fixed, mine)[0]
@@ -2656,7 +2672,8 @@ def selftest():
     chk("sane() drops a test with the wrong function name",
         sane(["assert nope(1)==1", "assert reverse_words('a b')=='b a'"], [good]) == ["assert reverse_words('a b')=='b a'"])
     LAST.update(code="x=1", err="")
-    chk("Rule Lawyer style exists and names the truncation pitfall", "int(a / b)" in STYLES["lawyer"])
+    chk("Rule Lawyer gets the truncation pitfall only on a task that needs it",
+        "int(a / b)" in pitfalls(HARD[0][2]) and "negative" not in pitfalls(HARD[4][2]))
     def fake_hunt(prompt, model):
         if "tough exam setter" in prompt:
             return "assert reverse_words('a b')=='b a'"
