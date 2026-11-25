@@ -2352,6 +2352,13 @@ def probes(spec):
             if re.search(r"\d", x) and " " in x:
                 y = re.sub(r"(?<![\w-])(\d+)", r"-\1", x, count=1)
                 out.append(f"assert ({one_arg[0]}({y!r}), True)[1]")
+    lit = r"('[^'\n]{0,40}'|-?\d+|True|False|None)"
+    if len(one_arg) == 1:  # the task's own worked example: e.g. 'x' -> y
+        for a, b in re.findall(r"('[^'\n]{1,40}')\s*->\s*" + lit, spec):
+            out.insert(0, f"assert {one_arg[0]}({a})=={b}")
+    if len(one_arg) >= 2:  # a pair example: 'x' <-> 'y' means f(x)==y and g(y)==x
+        for a, b in re.findall(r"('[^'\n]{1,40}')\s*<->\s*('[^'\n]{1,40}')", spec):
+            out[:0] = [f"assert {one_arg[0]}({a})=={b}", f"assert {one_arg[1]}({b})=={a}"]
     if len(one_arg) >= 2 and any(w in low for w in ("reverse", "<->", "undo", "inverse", "round trip")):
         f, g = one_arg[0], one_arg[1]
         for x in lits:
@@ -2658,7 +2665,10 @@ def selftest():
     solve(TASKS[0][2], TASKS[0][3], "m", fake_hunt, "genius")
     chk("loss log keeps the final wrong answer and its error", "return s" in LAST.get("code", "") and LAST.get("err"))
     chk("Stress Probe: negative-number probe from the task's own example",
-        probes(HARD[0][2]) == ["assert (rpn('-3 4 + 2 *'), True)[1]"])
+        "assert (rpn('-3 4 + 2 *'), True)[1]" in probes(HARD[0][2]))
+    chk("Stress Probe: the task's worked examples become checks",
+        "assert rpn('3 4 + 2 *')==14" in probes(HARD[0][2])
+        and "assert encode('aaab')=='3a1b'" in probes(HARD[2][2]) and "assert decode('3a1b')=='aaab'" in probes(HARD[2][2]))
     rl = probes(HARD[2][2])
     chk("Stress Probe: round trip plus a run longer than 9",
         "assert decode(encode('aaab'))=='aaab'" in rl and any("a" * 13 in x for x in rl))

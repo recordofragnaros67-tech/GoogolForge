@@ -59,6 +59,8 @@ To try another value, add `"threads": 4` (or 6) to `~/googolforge/config.json`, 
 
 v3.5 adds a Rule Lawyer draft (obeys exact rules, knows Python pitfalls like // flooring), a loss log (`forge bench losses` shows the exact wrong answer after a run), and `--strong=MODEL` to escalate to a bigger model such as qwen2.5-coder:7b.
 
+v3.6.3 turns the task's own worked examples (like `'3 4 + 2 *' -> 14`) into checks.
+
 v3.6.2 adds a Second Opinion: an early win counts only if two drafts that pass every self-test give identical outputs; otherwise it escalates to the strong model.
 
 v3.6.1 adds a Rule Lawyer autofix (when the task says "truncating toward zero", `a // b` becomes `int(a / b)`) and puts the Python pitfalls into every repair.
