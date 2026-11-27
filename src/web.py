@@ -132,6 +132,25 @@ def overview():
     return o
 
 
+SCORES = HOME / "bench_history.json"
+
+
+def scores():
+    """Genius Lab (v3.9): this phone's own exam history, newest first. Only real local runs."""
+    try:
+        h = json.loads(SCORES.read_text())
+    except Exception:
+        return []
+    out = []
+    for r in reversed(h[-12:]):
+        suite = r.get("suite", "arena")
+        kind = suite if suite != "arena" else ("hard" if r.get("hard") else ("quick" if r.get("quick") else "arena"))
+        out.append({"date": str(r.get("date", ""))[:16], "model": str(r.get("model", "")), "set": kind,
+                    "style": str(r.get("style", "plain")), "score": int(r.get("score", 0)),
+                    "solved": f"{r.get('solved', 0)}/{r.get('tasks', 0)}", "seconds": int(r.get("seconds", 0))})
+    return out
+
+
 def make_quiz(topic):
     sys.path.insert(0, str(HOME))
     import academy as AC
@@ -190,6 +209,9 @@ button:active{background:#30363d}button.go{background:var(--gold);color:#000;bor
 pre{white-space:pre-wrap;word-break:break-word;background:#010409;border-radius:8px;padding:10px;font-size:13px;max-height:55vh;overflow:auto;margin:8px 0 0}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}.cmd{color:var(--gold);font-family:monospace;font-size:13px}
 .q{margin:12px 0}.q label{display:block;padding:8px;border:1px solid var(--line);border-radius:8px;margin:6px 0}
+.lab{border-color:var(--gold)}.lab h2{color:var(--gold)}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--dim);font-weight:500}.sb{height:6px;background:var(--line);border-radius:3px;min-width:50px}.sb i{display:block;height:100%;border-radius:3px}
 .right{border-color:var(--ok)!important}.wrong{border-color:var(--bad)!important}h2{font-size:15px;margin:0 0 10px;color:var(--dim)}
 </style></head><body>
 <header><h1>GoogolForge</h1><div class="sub"><span id="ai" class="dot"></span><span id="ais">checking AI...</span></div></header>
@@ -219,6 +241,12 @@ pre{white-space:pre-wrap;word-break:break-word;background:#010409;border-radius:
 <button onclick="fcmd('mutate')">Test my tests</button><button onclick="fcmd('explain')">Explain file</button><button onclick="cmd('index')">Index my code</button>
 <button onclick="cmd('duel')">Start duel</button><button onclick="cmd('duel','check')">Check duel</button><button onclick="cmd('ci')">Cloud tests</button></div>
 <div class="sub">Team build: type "team build a stopwatch" above. Ask about your code: "in my code, where is the score saved?"</div></div>
+
+<div class="card lab"><h2>Genius Lab</h2><div class="grid">
+<button class="go" onclick="cmd('genius')">Genius exam</button><button onclick="cmd('losses')">What went wrong</button><button onclick="cmd('bench')">Quick exam</button>
+<button onclick="cmd('heplus')">HumanEval+</button><button onclick="cmd('holdout')">Holdout</button><button onclick="cmd('shootout')">Shootout</button></div>
+<div class="sub" style="margin-top:8px">Scores below are this phone's own runs. The holdout is the honest test: never tune on it.</div>
+<div id="scores" class="sub" style="margin-top:6px">No exams yet. Tap Quick exam to start.</div></div>
 
 <div class="card" id="outcard" style="display:none"><div class="cmd" id="outcmd"></div><pre id="out"></pre></div>
 <div class="card" id="quizcard" style="display:none"></div>
@@ -255,7 +283,11 @@ async function refresh(){const o=await api('/api/overview');
  document.getElementById('pbar').style.width=(o.total?100*o.done/o.total:0)+'%';document.getElementById('rank').textContent=o.rank;
  document.getElementById('xp').textContent=o.xp;document.getElementById('streak').textContent=o.streak;
  const s=document.getElementById('file'),cur=s.value;s.innerHTML=o.files.length?o.files.map(f=>'<option>'+esc(f)+'</option>').join(''):'<option value="">(no files yet)</option>';if(cur)s.value=cur}
-refresh();setInterval(refresh,15000);
+async function lab(){const s=await api('/api/scores');if(!s.length)return;
+ const col=v=>v>=80?'var(--ok)':v>=50?'var(--gold)':'var(--bad)';
+ document.getElementById('scores').innerHTML='<table><tr><th>When</th><th>Exam</th><th>Score</th><th>Solved</th><th>Time</th></tr>'+s.map(r=>'<tr><td>'+esc(r.date.replace('T',' '))+'</td><td>'+esc(r.set+' '+r.style)+'<div class="sub">'+esc(r.model)+'</div></td><td><b>'+r.score+'</b><div class="sb"><i style="width:'+r.score+'%;background:'+col(r.score)+'"></i></div></td><td>'+esc(r.solved)+'</td><td>'+Math.round(r.seconds/60)+'m</td></tr>').join('')+'</table>'}
+async function refreshAll(){await refresh();lab()}
+refreshAll();setInterval(refreshAll,15000);
 </script></body></html>"""
 
 
@@ -291,6 +323,8 @@ class H(BaseHTTPRequestHandler):
             return self.ok(SW, "text/javascript")
         if path == "/api/overview":
             return self.ok(overview())
+        if path == "/api/scores":
+            return self.ok(scores())
         if path == "/api/history":
             return self.ok(A.mem_load()["history"][-15:])
         if path.startswith("/api/job/"):
@@ -389,6 +423,17 @@ def selftest():
     g = post("/api/grade", {"id": "q1", "answers": ["2", "2", "0"]})[1]
     chk("quiz graded on the server", g.get("score") == 2 and g.get("total") == 3)
     chk("a quiz can't be graded twice", "error" in post("/api/grade", {"id": "q1", "answers": ["2"] * 3})[1])
+    global SCORES
+    SCORES = d / "bench_history.json"
+    chk("Genius Lab empty without runs", json.loads(get("/api/scores")[1]) == [])
+    SCORES.write_text(json.dumps([{"date": "2026-11-27T11:00", "model": "m", "tasks": 6, "solved": 5, "score": 83,
+                                   "seconds": 600, "hard": True, "style": "genius", "suite": "arena"}]))
+    sc = json.loads(get("/api/scores")[1])
+    chk("Genius Lab shows real local runs", sc and sc[0]["score"] == 83 and sc[0]["set"] == "hard")
+    chk("Genius Lab locked without token", get("/api/scores", tok=False)[0] == 403)
+    chk("genius button runs the Genius exam", build_args({"command": "genius", "arg": ""})[-3:] == ["bench", "--genius", "--hard"])
+    chk("slow exams ask first", A.CATALOG["genius"][2] and A.CATALOG["holdout"][2])
+    chk("Genius Lab on the page", "Genius Lab" in PAGE and "/api/scores" in PAGE)
     srv.shutdown()
     shutil.rmtree(d, ignore_errors=True)
     print(f"\nSELFTEST: {'ALL PASSED' if not fails else str(fails) + ' FAILED'}")

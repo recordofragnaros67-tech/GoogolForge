@@ -108,3 +108,7 @@ All four use the same sealed judge: the model sees only the task prompt, a failu
 [MBPP+](https://github.com/evalplus/mbppplus_release) v0.2.0 (EvalPlus, Apache-2.0): the 40 tasks are evenly spaced among the tasks a plain equality check can judge fairly (the prompt's worked example matches the stored input exactly and the canonical solution reproduces it; set-order and not-None special cases are left out). Rebuild with `tools/build_mbppplus.py`.
 
 **Holdout.** The 6 holdout tasks (interval coverage, pattern expansion, limited coins, meeting slots, a logic parser with implication, rectangle union area) were written for GoogolForge and are in no public benchmark. They are a holdout: never use their results, losses or hidden inputs to tune prompts, pitfalls, lint fixes, probes or routing. Tune on the other sets, then run `--holdout` to see whether a gain is real. Losses are not saved for this set. Each reference is checked against a brute-force solution in `tools/build_holdout.py`.
+
+## Genius Lab dashboard (v3.9)
+
+`forge web` now has a Genius Lab card. It has buttons for the Genius exam, What went wrong, the Quick exam, HumanEval+, the Holdout, and the Shootout. It also shows a color-coded table of this phone's own exam scores, read from `~/googolforge/bench_history.json`. Slow exams ask before they start. You can type too, for example "run the genius exam" or "what did the AI get wrong".

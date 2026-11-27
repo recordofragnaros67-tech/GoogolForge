@@ -50,12 +50,22 @@ CATALOG = {
     "team":     ("gf", "text", False, "Architect, Coder and Tester AIs build it together"),
     "duel":     ("gf", "duelstep", False, "you vs the AI on hidden tests (check = score it)"),
     "ci":       ("gf", "none", False, "set up the free GitHub cloud test robot"),
+    "genius":   ("gf", "none", True,  "Genius mode exam: 4 drafts, spec tests, strong-model escalation (slow)"),
+    "losses":   ("gf", "none", False, "show what the last exam got wrong"),
+    "heplus":   ("gf", "none", False, "HumanEval+ quick exam (8 public tasks)"),
+    "holdout":  ("gf", "none", True,  "holdout exam: 6 never-tuned tasks, the honest test (slow)"),
 }
-GF_ARGS = {"bench": ["bench", "--quick"], "shootout": ["shootout"], "lessons": ["lessons"], "health": ["test"]}
+GF_ARGS = {"bench": ["bench", "--quick"], "shootout": ["shootout"], "lessons": ["lessons"], "health": ["test"],
+           "genius": ["bench", "--genius", "--hard"], "losses": ["bench", "losses"],
+           "heplus": ["bench", "--heplus", "--quick"], "holdout": ["bench", "--holdout"]}
 KINDS = {"game": "game", "cli": "cli", "todo": "cli", "to-do": "cli", "api": "api", "server": "api",
          "bot": "bot", "chatbot": "bot", "data": "data", "csv": "data", "stats": "data"}
 
 RULES = [  # (regex, command, how to get the argument)
+    (r"\bholdout\b", "holdout", None),
+    (r"\b(what did (it|the ai) get wrong|losses|wrong answers)\b", "losses", None),
+    (r"\bhuman.?eval\b", "heplus", None),
+    (r"\bgenius\b", "genius", None),
     (r"\b(mutat\w*|test my tests|how good are my tests)\b", "mutate", "file"),
     (r"\bexplain\b.*\.py\b|\bexplain (my|the|this)\b.*\b(code|file|program)\b|\bwalk me through\b", "explain", "file"),
     (r"\b(re)?index\b", "index", None),
