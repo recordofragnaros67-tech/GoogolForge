@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""GoogolForge Benchmark Arena v1.5 (HumanEval+ slice, Genius style with Smart Router, Elite style, sealed hidden tests, Shootout, Hard mode, Team style) - turn "quality" into a number.
+"""GoogolForge Benchmark Arena v1.6 (HumanEval+ slice and full 164, MBPP+ slice, original holdout set, Genius style with Smart Router, Elite style, sealed hidden tests, Shootout, Hard mode, Team style) - turn "quality" into a number.
 Ten fixed coding tasks with hidden tests. The coder model gets two tries per task
 (the second sees the error, like the real engine). Scores are saved so every
 model, prompt or version change is measured against the last one."""
-import ast, datetime, json, os, pathlib, re, subprocess, sys, tempfile, time, urllib.request
+import ast, datetime, gzip, json, os, pathlib, re, subprocess, sys, tempfile, time, urllib.request
 sys.dont_write_bytecode = True
 
 HOME = pathlib.Path(os.environ.get("GF_HOME", str(pathlib.Path.home() / "googolforge")))
@@ -80,7 +80,7 @@ def extract(text):
     return (max(m, key=len) if m else text or "").strip() + "\n"
 
 
-PREFIX = {"code": ""}  # HumanEval+ tasks: the task's own signature, imports and helpers go first
+PREFIX = {"code": "", "slow": False}  # dataset tasks: the task's own signature, imports and helpers go first
 
 
 def check(code, tests):
@@ -89,7 +89,7 @@ def check(code, tests):
         f.write_text(PREFIX["code"] + "\n" + code + "\n" + tests + "\nprint('BENCH_OK')\n")
         try:
             r = subprocess.run([sys.executable, "-B", str(f)], capture_output=True, text=True,
-                               timeout=30 if PREFIX["code"] else 15, stdin=subprocess.DEVNULL, cwd=d)
+                               timeout=30 if PREFIX["code"] or PREFIX["slow"] else 15, stdin=subprocess.DEVNULL, cwd=d)
         except subprocess.TimeoutExpired:
             return False, "timed out"
         return "BENCH_OK" in r.stdout, (r.stderr or r.stdout)[-600:]
@@ -373,28 +373,45 @@ def genius_code(spec, model, asker, lister=None):
     return best
 
 
-# ---- HumanEval+ slice (v3.7) ------------------------------------------------------------
-# 40 fixed tasks from EvalPlus HumanEval+ v0.1.10 (Apache-2.0, github.com/evalplus/humanevalplus_release):
-# every 4th task, up to 120 hidden inputs each, expected outputs from the canonical solutions.
-# Built by tools/build_heplus.py. The model sees only the function signature and docstring.
-HEP_URL = "https://raw.githubusercontent.com/recordofragnaros67-tech/GoogolForge/main/data/heplus40.json"
+# ---- Dataset suites (v3.7 HumanEval+ slice; v3.8 full HumanEval+, MBPP+ slice, holdout) -----------
+# heplus:     40 fixed tasks from EvalPlus HumanEval+ v0.1.10 (Apache-2.0, github.com/evalplus/humanevalplus_release):
+#             every 4th task, up to 120 hidden inputs each. Built by tools/build_heplus.py.
+# heplusfull: all 164 HumanEval+ tasks, up to 80 hidden inputs each, gzip. tools/build_heplus.py --full.
+# mbppplus:   40 fixed tasks from EvalPlus MBPP+ v0.2.0 (Apache-2.0, github.com/evalplus/mbppplus_release),
+#             up to 100 hidden inputs each. Built by tools/build_mbppplus.py.
+# holdout:    6 ORIGINAL hard tasks written for GoogolForge, in no public benchmark. HOLDOUT: never use its
+#             results, losses or hidden inputs to tune prompts, pitfalls, lint fixes, probes or routing.
+#             Built by tools/build_holdout.py (every reference is checked against brute force there).
+# Expected outputs come from the canonical/reference solutions. The model sees only the task prompt.
+DATA_URL = "https://raw.githubusercontent.com/recordofragnaros67-tech/GoogolForge/main/data/"
+HEP_URL = DATA_URL + "heplus40.json"
+DATASETS = {  # suite: (file, what it is, download size, model instruction)
+    "heplus": ("heplus40.json", "the HumanEval+ slice", "400 KB", "Complete this Python function. Keep the exact name and signature:\n"),
+    "heplusfull": ("heplus164.json.gz", "full HumanEval+", "250 KB", "Complete this Python function. Keep the exact name and signature:\n"),
+    "mbppplus": ("mbppplus40.json", "the MBPP+ slice", "340 KB", "Write a Python function for this task. Use the exact function name from the example:\n"),
+    "holdout": ("holdout6.json", "the holdout set", "40 KB", "Complete this Python function. Keep the exact name and signature:\n"),
+}
+SHORT = {"heplus": "he_", "heplusfull": "he_", "mbppplus": "mbpp_", "holdout": "ho_"}
 
 
-def he_data():
-    here = pathlib.Path(__file__).resolve().parent.parent / "data" / "heplus40.json"
-    mine = HOME / "data" / "heplus40.json"
+def he_data(suite="heplus"):
+    name = DATASETS[suite][0]
+    here = pathlib.Path(__file__).resolve().parent.parent / "data" / name
+    mine = HOME / "data" / name
     if here.exists():
-        return json.loads(here.read_text())
-    if not mine.exists():
-        print("Downloading the HumanEval+ slice (about 400 KB)...")
-        mine.parent.mkdir(parents=True, exist_ok=True)
-        with urllib.request.urlopen(HEP_URL, timeout=60) as r:
-            mine.write_bytes(r.read())
-    return json.loads(mine.read_text())
+        raw = here.read_bytes()
+    else:
+        if not mine.exists():
+            print(f"Downloading {DATASETS[suite][1]} (about {DATASETS[suite][2]})...")
+            mine.parent.mkdir(parents=True, exist_ok=True)
+            with urllib.request.urlopen(DATA_URL + name, timeout=60) as r:
+                mine.write_bytes(r.read())
+        raw = mine.read_bytes()
+    return json.loads(gzip.decompress(raw) if name.endswith(".gz") else raw)
 
 
 def he_tests(t):
-    """Sealed hidden tests for one HumanEval+ task. A failure says only which case number failed."""
+    """Sealed hidden tests for one dataset task. A failure says only which case number failed."""
     cases = ",\n".join(f"({i}, {o})" for i, o in t["cases"])
     atol = t.get("atol") or 0
     root = t["entry"] == "find_zero"  # any real root counts, as in EvalPlus
@@ -412,40 +429,57 @@ def he_tests(t):
                "    assert _same(_r, _o), f'wrong answer on hidden case {_n}'\n"))
 
 
-def he_tasks():
-    d = he_data()
-    return [(t["id"].replace("HumanEval/", "he_") + "_" + t["entry"], 3,
-             "Complete this Python function. Keep the exact name and signature:\n" + t["prompt"],
-             he_tests(t), t["prompt"]) for t in d["tasks"]]
+def he_prefix(t):
+    """Code that goes before the model's answer: HumanEval+ needs its prompt (imports, helpers)."""
+    return t.get("prefix", t["prompt"])
+
+
+def he_tasks(suite="heplus"):
+    d, intro = he_data(suite), DATASETS[suite][3]
+    return [(SHORT[suite] + t["id"].split("/")[-1] + "_" + t["entry"], 3, intro + t["prompt"],
+             he_tests(t), he_prefix(t)) for t in d["tasks"]]
+
+
+def ref_failures(suite):
+    """Ids of tasks whose own reference/canonical solution fails its hidden tests (should be none)."""
+    bad = []
+    for t in he_data(suite)["tasks"]:
+        PREFIX.update(code=he_prefix(t), slow=True)
+        if not check(he_prefix(t) + t["ref"], he_tests(t))[0]:
+            bad.append(t["id"])
+    PREFIX.update(code="", slow=False)
+    return bad
 
 
 def run(model=None, quick=False, asker=ask, style="plain", quiet=False, hard=False, suite="arena"):
     model = model or C["coder"]
-    if suite == "heplus":
-        tasks = he_tasks()[:8] if quick else he_tasks()
+    if suite in DATASETS:
+        tasks = he_tasks(suite)[:8] if quick else he_tasks(suite)
     else:
         tasks = HARD if hard else (TASKS[:4] if quick else TASKS)
     say = (lambda *a, **k: None) if quiet else print
     say(f"BENCHMARK ARENA  model={model}  style={style}  tasks={len(tasks)}\n")
+    if suite == "holdout":
+        say("HOLDOUT set: a check on real progress. Never tune prompts or heuristics on it; its losses are not saved.\n")
     first = second = 0
     t0 = time.time()
     rows = []
     for name, lvl, spec, tests, *pre in tasks:
         s = time.time()
-        PREFIX["code"] = pre[0] if pre else ""
+        PREFIX.update(code=pre[0] if pre else "", slow=bool(pre))
         try:
             res = solve(spec, tests, model, asker, style)
         except Exception as e:
             say(f"AI call failed ({e}). Start it with: forge-start")
             return None
         finally:
-            PREFIX["code"] = ""
+            PREFIX.update(code="", slow=False)
         first += res == 1
         second += res in (1, 2)
         mark = {1: "WIN  (1st try)", 2: "WIN  (after fix)", 0: "LOSS"}[res]
         say(f"  L{lvl} {name:<16} {mark:<17} {time.time() - s:5.1f}s")
         rows.append({"task": name, "result": res})
-        if res == 0 and LAST:
+        if res == 0 and LAST and suite != "holdout":
             LOSSES.mkdir(parents=True, exist_ok=True)
             (LOSSES / f"{name}.txt").write_text(f"# TASK\n# {spec}\n\n{LAST.get('code', '')}\n\n# ERROR\n"
                                                 + "\n".join("# " + x for x in LAST.get("err", "").splitlines()[-12:]))
@@ -678,6 +712,22 @@ def selftest():
         not wrong[0] and "hidden case" in wrong[1] and "[" not in wrong[1].split("hidden case")[-1])
     chk("HumanEval+ prompt never contains the reference or the cases",
         all(t["ref"].strip() not in he_tasks()[k][2] and he_tasks()[k][3] not in he_tasks()[k][2] for k, t in enumerate(hd[:5])))
+    for suite, n, least in (("heplusfull", 164, 10), ("mbppplus", 40, 10), ("holdout", 6, 20)):
+        ts = he_data(suite)["tasks"]
+        chk(f"{suite}: {n} tasks, each with at least {least} hidden cases",
+            len(ts) == n and all(len(t["cases"]) >= least for t in ts) and len({t["id"] for t in ts}) == n)
+        bad = ref_failures(suite)
+        chk(f"{suite}: every reference solution passes its hidden tests" + (f" (failed: {bad[:5]})" if bad else ""), not bad)
+        tk = he_tasks(suite)
+        chk(f"{suite}: prompts never contain the reference or the cases",
+            all(t["ref"].strip() not in tk[k][2] and t["cases"][-1][0] not in tk[k][2] for k, t in enumerate(ts)))
+        t0 = ts[0]
+        PREFIX.update(code=he_prefix(t0), slow=True)
+        w = check(f"def {t0['entry']}(*a):\n    return None\n", he_tests(t0))
+        PREFIX.update(code="", slow=False)
+        chk(f"{suite}: sealed judge fails a wrong answer and names only the case number",
+            not w[0] and "hidden case" in w[1])
+    chk("holdout is marked as a holdout", "HOLDOUT" in he_data("holdout")["source"])
     LAST.clear()
     print(f"\nSELFTEST: {'ALL PASSED' if not fails else str(fails) + ' FAILED'}")
     return fails == 0
@@ -731,4 +781,5 @@ if __name__ == "__main__":
         rest = [x for x in a if not x.startswith("--")]
         style = "genius" if "--genius" in a else "elite" if "--elite" in a else "team" if "--team" in a else "plain"
         run(rest[0] if rest else None, "--quick" in a, style=style, hard="--hard" in a,
-            suite="heplus" if "--heplus" in a else "arena")
+            suite=next((k for f, k in (("--heplus-full", "heplusfull"), ("--heplus", "heplus"), ("--mbppplus", "mbppplus"),
+                                      ("--holdout", "holdout")) if f in a), "arena"))

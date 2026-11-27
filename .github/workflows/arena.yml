@@ -8,7 +8,7 @@ on:
         description: "genius, elite, team or plain"
         default: "genius"
       set:
-        description: "hard, quick, full, or heplus (40 HumanEval+ tasks)"
+        description: "hard, quick, full, heplus (40 HumanEval+), heplusfull (164 HumanEval+), mbppplus (40 MBPP+), or holdout (6 original tasks; never tune on it)"
         default: "hard"
       coder:
         description: "fast coder model"
@@ -49,7 +49,7 @@ jobs:
       - name: Run the Arena
         run: |
           FLAGS="--${{ inputs.style }}"
-          case "${{ inputs.set }}" in hard) FLAGS="$FLAGS --hard";; quick) FLAGS="$FLAGS --quick";; heplus) FLAGS="$FLAGS --heplus";; esac
+          case "${{ inputs.set }}" in hard) FLAGS="$FLAGS --hard";; quick) FLAGS="$FLAGS --quick";; heplus) FLAGS="$FLAGS --heplus";; heplusfull) FLAGS="$FLAGS --heplus-full";; mbppplus) FLAGS="$FLAGS --mbppplus";; holdout) FLAGS="$FLAGS --holdout";; esac
           python -B src/bench.py $FLAGS | tee arena.txt
           python -B src/bench.py losses | tee losses.txt
           { echo '### Wrong answers (for diagnosis)'; echo '```'; cat losses.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

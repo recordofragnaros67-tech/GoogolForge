@@ -39,6 +39,7 @@ HELP = f"""GoogolForge v{VERSION}
   Bench+:    forge bench --genius (best)   forge bench --elite   forge bench --hard   forge bench --team
   Plugins:   forge plugins   (drop a .py file in ~/googolforge/plugins to add a command)
   Measure:   forge bench          forge bench --quick      forge bench history
+  Datasets:  forge bench --heplus | --heplus-full | --mbppplus | --holdout (never tune on it)
   Shootout:  forge shootout       forge shootout --prompts forge shootout --apply   forge shootout pull
   Publish:   forge publish        forge autopublish on
   Health:    forge doctor         forge test (every self-check at once)

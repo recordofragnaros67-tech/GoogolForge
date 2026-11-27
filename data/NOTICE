@@ -1,6 +1,19 @@
-data/heplus40.json is derived from EvalPlus HumanEval+ v0.1.10
+data/heplus40.json and data/heplus164.json.gz are derived from EvalPlus HumanEval+ v0.1.10
 https://github.com/evalplus/humanevalplus_release
 Copyright the EvalPlus authors. Licensed under the Apache License, Version 2.0:
 https://www.apache.org/licenses/LICENSE-2.0
-Changes: 40-task subset (every 4th task), at most 120 inputs per task, expected outputs
-computed from the canonical solutions by tools/build_heplus.py.
+Changes: heplus40.json is a 40-task subset (every 4th task), at most 120 inputs per task;
+heplus164.json.gz has all 164 tasks, at most 80 inputs per task, gzip-compressed. Expected
+outputs computed from the canonical solutions by tools/build_heplus.py.
+
+data/mbppplus40.json is derived from EvalPlus MBPP+ v0.2.0 (MbppPlus.jsonl.gz)
+https://github.com/evalplus/mbppplus_release
+Copyright the EvalPlus authors. Licensed under the Apache License, Version 2.0:
+https://www.apache.org/licenses/LICENSE-2.0
+MBPP+ builds on MBPP by Austin et al. (Google Research), also licensed under Apache-2.0.
+Changes: 40-task subset (evenly spaced among tasks a plain equality check can judge fairly),
+at most 100 inputs per task, expected outputs computed from the canonical solutions by
+tools/build_mbppplus.py.
+
+data/holdout6.json is original GoogolForge work (tools/build_holdout.py), not derived from
+any benchmark. It is a holdout set: do not tune prompts or heuristics on it.

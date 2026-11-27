@@ -86,3 +86,18 @@ It updates GoogolForge, picks the strongest model your free RAM allows (7B, 3B o
 `forge bench --heplus` runs 40 fixed tasks from [EvalPlus HumanEval+](https://github.com/evalplus/humanevalplus_release) v0.1.10 (every 4th task, up to 120 hidden inputs each). The model only sees each function's signature and docstring; the sealed judge tells a retry only the error type. Use `--quick` for the first 8 tasks. In GitHub Actions: arena > Run workflow > set `heplus`.
 
 40 tasks instead of 6 means one lucky or unlucky task moves the score by 2.5 points, not 17. The data is in `data/heplus40.json` and is rebuilt with `tools/build_heplus.py`. HumanEval+ is by the EvalPlus authors, Apache-2.0 (see `data/NOTICE`).
+
+## Full HumanEval+, MBPP+ and a holdout set (v3.8)
+
+| Command | Arena `set` | Tasks | Hidden inputs per task | Data |
+|---|---|---|---|---|
+| `forge bench --heplus` | `heplus` | 40 (every 4th HumanEval+ task) | up to 120 | `data/heplus40.json` |
+| `forge bench --heplus-full` | `heplusfull` | all 164 HumanEval+ tasks | up to 80 | `data/heplus164.json.gz` (gzip) |
+| `forge bench --mbppplus` | `mbppplus` | 40 MBPP+ tasks | up to 100 | `data/mbppplus40.json` |
+| `forge bench --holdout` | `holdout` | 6 original hard tasks | 34 to 50 | `data/holdout6.json` |
+
+All four use the same sealed judge: the model sees only the task prompt, a failure names only the hidden case number, and expected outputs come from the canonical or reference solutions. The self-test runs every reference solution against every hidden test of every set.
+
+[MBPP+](https://github.com/evalplus/mbppplus_release) v0.2.0 (EvalPlus, Apache-2.0): the 40 tasks are evenly spaced among the tasks a plain equality check can judge fairly (the prompt's worked example matches the stored input exactly and the canonical solution reproduces it; set-order and not-None special cases are left out). Rebuild with `tools/build_mbppplus.py`.
+
+**Holdout.** The 6 holdout tasks (interval coverage, pattern expansion, limited coins, meeting slots, a logic parser with implication, rectangle union area) were written for GoogolForge and are in no public benchmark. They are a holdout: never use their results, losses or hidden inputs to tune prompts, pitfalls, lint fixes, probes or routing. Tune on the other sets, then run `--holdout` to see whether a gain is real. Losses are not saved for this set. Each reference is checked against a brute-force solution in `tools/build_holdout.py`.

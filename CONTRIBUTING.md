@@ -9,6 +9,7 @@ Thanks for helping. GoogolForge stays free, offline and stdlib-only.
 3. **Termux-safe.** Use `${TMPDIR:-/tmp}`, never assume `/tmp`.
 4. **No secrets.** CI blocks commits that contain keys or tokens.
 5. **Honest scores.** Benchmark claims must come from the sealed judge (`forge bench`), with the model and device named.
+6. **Respect the holdout.** Never tune prompts or heuristics on `forge bench --holdout` (its tasks, results or hidden inputs). It exists to check that a gain is real.
 
 ## Pull requests
 Keep them small, explain what changed and why, and paste your selftest and bench output.
