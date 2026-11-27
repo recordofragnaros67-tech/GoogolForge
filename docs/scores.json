@@ -195,5 +195,19 @@
     "score": 67,
     "seconds": 796,
     "machine": "GitHub Actions (ubuntu-24.04-arm, aarch64 CPU)"
+  },
+  {
+    "date": "2026-11-27T03:49",
+    "model": "qwen2.5-coder:1.5b + qwen2.5-coder:7b",
+    "style": "genius",
+    "hard": true,
+    "quick": false,
+    "suite": "arena",
+    "tasks": 6,
+    "solved": 5,
+    "first_try": 5,
+    "score": 83,
+    "seconds": 1222,
+    "machine": "GitHub Actions (ubuntu-24.04-arm, aarch64 CPU)"
   }
 ]
