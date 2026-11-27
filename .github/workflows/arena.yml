@@ -16,11 +16,18 @@ on:
       strong:
         description: "strong model the Smart Router escalates to (try qwen2.5-coder:7b)"
         default: "qwen2.5-coder:3b"
+      runner:
+        description: "ubuntu-latest (x64) or ubuntu-24.04-arm (ARM64, like the Pixel 8's chip family)"
+        default: "ubuntu-latest"
+        type: choice
+        options:
+          - ubuntu-latest
+          - ubuntu-24.04-arm
 permissions:
   contents: write
 jobs:
   bench:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 300
     env:
       GF_HOME: ${{ github.workspace }}/gfhome
@@ -52,7 +59,8 @@ jobs:
           python - <<'PY'
           import json, os, pathlib
           h = json.loads(pathlib.Path(os.environ["GF_HOME"], "bench_history.json").read_text())[-1]
-          h["machine"] = "GitHub Actions (ubuntu-latest, CPU)"
+          import platform
+          h["machine"] = "GitHub Actions (${{ inputs.runner }}, " + platform.machine() + " CPU)"
           h["model"] = h["model"] + " + " + "${{ inputs.strong }}"
           keep = ("date","model","style","hard","quick","suite","tasks","solved","first_try","score","seconds","machine")
           pathlib.Path("entry.json").write_text(json.dumps({k: h.get(k, "arena" if k == "suite" else None) for k in keep}))
@@ -78,7 +86,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: arena-results
+          name: arena-results-${{ inputs.runner }}
           path: |
             arena.txt
             losses.txt
