@@ -112,3 +112,7 @@ All four use the same sealed judge: the model sees only the task prompt, a failu
 ## Genius Lab dashboard (v3.9)
 
 `forge web` now has a Genius Lab card. It has buttons for the Genius exam, What went wrong, the Quick exam, HumanEval+, the Holdout, and the Shootout. It also shows a color-coded table of this phone's own exam scores, read from `~/googolforge/bench_history.json`. Slow exams ask before they start. You can type too, for example "run the genius exam" or "what did the AI get wrong".
+
+## Autopilot (v3.10)
+
+`bash scripts/autopilot.sh` runs the routine in order: update, start the local AI, self-test, quick exam, Genius exam (only while charging), and a report. It resumes where it stopped and skips steps already done today. It finishes by suggesting your next moves based on this phone's own scores. `--suggest` prints only the suggestions. `--schedule` runs it every night at 3:00 through cronie, and `--unschedule` removes that. Nothing is published automatically.
