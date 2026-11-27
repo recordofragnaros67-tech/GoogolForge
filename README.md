@@ -79,7 +79,14 @@ The strongest model now acts like a tough exam setter: it lists the trickiest ed
 ```bash
 curl -fsSL https://raw.githubusercontent.com/recordofragnaros67-tech/GoogolForge/main/scripts/genius_run.sh | bash
 ```
+
 It updates GoogolForge, picks the strongest model your free RAM allows (7B, 3B or 1.5B), runs the sealed Hard exam in Genius mode, shows the wrong answers, and saves a report.
+
+Pixel Proof Run (v3.8): the first real on-device scores, incl. the never-tuned holdout:
+```
+curl -fsSL https://raw.githubusercontent.com/recordofragnaros67-tech/GoogolForge/main/scripts/pixel_proof.sh -o pixel_proof.sh && bash pixel_proof.sh
+```
+Plans: `core` (default, selftest + 4 quick exams + holdout), `full` (adds Genius Hard, HumanEval+ 40, Genius holdout), `demo` (one 3-minute live exam).
 
 ## HumanEval+ slice (v3.7)
 
