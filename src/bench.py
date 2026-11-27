@@ -3,7 +3,7 @@
 Ten fixed coding tasks with hidden tests. The coder model gets two tries per task
 (the second sees the error, like the real engine). Scores are saved so every
 model, prompt or version change is measured against the last one."""
-import ast, datetime, gzip, json, os, pathlib, re, subprocess, sys, tempfile, time, urllib.request
+import ast, datetime, gzip, json, os, pathlib, re, subprocess, sys, tempfile, time, urllib.error, urllib.request
 sys.dont_write_bytecode = True
 
 HOME = pathlib.Path(os.environ.get("GF_HOME", str(pathlib.Path.home() / "googolforge")))
@@ -71,8 +71,17 @@ def ask(prompt, model):
     body = {"model": model, "prompt": prompt, "stream": False, "options": {"temperature": 0.1, "num_predict": 1536, "repeat_penalty": 1.1, "num_thread": int(C.get("threads", 5))}, "keep_alive": C.get("keep_alive", "30m")}
     req = urllib.request.Request(C["ollama"] + "/api/generate", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
-    with NOPROXY.open(req, timeout=600) as r:
-        return json.loads(r.read())["response"]
+    for attempt in range(4):  # v3.8.2: retry transient model-server errors (HTTP 5xx, dropped connection)
+        try:
+            with NOPROXY.open(req, timeout=600) as r:
+                return json.loads(r.read())["response"]
+        except urllib.error.HTTPError as e:
+            if e.code < 500 or attempt == 3:
+                raise
+        except (urllib.error.URLError, ConnectionError):
+            if attempt == 3:
+                raise
+        time.sleep(5 * 3 ** attempt)
 
 
 def extract(text):

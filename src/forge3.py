@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """GoogolForge v3.0 Pro Tools: explain, mutate, memory (RAG), team, duel, ci.
 All free and offline. Every AI step is checked by real tests wherever possible."""
-import ast, copy, json, math, os, pathlib, random, re, subprocess, sys, tempfile, urllib.request
+import ast, copy, json, math, os, pathlib, random, re, subprocess, sys, tempfile, time, urllib.error, urllib.request
 sys.dont_write_bytecode = True
 
 HOME = pathlib.Path(os.environ.get("GF_HOME", str(pathlib.Path.home() / "googolforge")))
@@ -43,8 +43,17 @@ C = conf()
 def post(path, body, timeout=600):
     req = urllib.request.Request(C["ollama"] + path, data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
-    with NOPROXY.open(req, timeout=timeout) as r:
-        return json.loads(r.read())
+    for attempt in range(4):  # v3.8.2: retry transient model-server errors
+        try:
+            with NOPROXY.open(req, timeout=timeout) as r:
+                return json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            if e.code < 500 or attempt == 3:
+                raise
+        except (urllib.error.URLError, ConnectionError):
+            if attempt == 3:
+                raise
+        time.sleep(5 * 3 ** attempt)
 
 
 def ai(prompt, model=None, fmt=None):

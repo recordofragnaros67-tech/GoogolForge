@@ -136,4 +136,4 @@ echo
 echo "Saved: $LOG"
 echo "Saved: $JSON"
 command -v termux-notification >/dev/null && termux-notification -t "GoogolForge" -c "Pixel proof run done ($PLAN)" >/dev/null 2>&1
-echo "Paste the RESULT block back to Hark; it goes on the Page labeled Pixel 8."
+echo "Paste the RESULT block back to Hark. Nothing is published automatically."
