@@ -55,7 +55,9 @@ Website: `docs/` (GitHub Pages). Contributing: see `CONTRIBUTING.md`.
 Every model call now sends `num_thread` (default **5**, the reported sweet spot for the Pixel 8's Tensor G3; more threads can slow it down).
 To try another value, add `"threads": 4` (or 6) to `~/googolforge/config.json`, then compare with `forge bench --quick`.
 
-## Genius mode (v3.6): Smart Router + Edge-Case Hunter + Rule Lawyer + Stress Probe
+## Genius mode (v3.11): Smart Router + Edge-Case Hunter + Rule Lawyer + Stress Probe + Docstring Examples
+
+v3.11 turns the `>>>` examples inside a task's docstring into self-checks (HumanEval-style tasks had none before). The examples are part of the task the model sees; no hidden data is used.
 
 v3.5 adds a Rule Lawyer draft (obeys exact rules, knows Python pitfalls like // flooring), a loss log (`forge bench losses` shows the exact wrong answer after a run), and `--strong=MODEL` to escalate to a bigger model such as qwen2.5-coder:7b.
 

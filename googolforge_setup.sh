@@ -2094,7 +2094,7 @@ cat > ~/googolforge/bench.py <<'BENCHEOF'
 Ten fixed coding tasks with hidden tests. The coder model gets two tries per task
 (the second sees the error, like the real engine). Scores are saved so every
 model, prompt or version change is measured against the last one."""
-import ast, datetime, gzip, json, os, pathlib, re, subprocess, sys, tempfile, time, urllib.request
+import ast, datetime, gzip, json, os, pathlib, re, subprocess, sys, tempfile, time, urllib.error, urllib.request
 sys.dont_write_bytecode = True
 
 HOME = pathlib.Path(os.environ.get("GF_HOME", str(pathlib.Path.home() / "googolforge")))
@@ -2162,8 +2162,17 @@ def ask(prompt, model):
     body = {"model": model, "prompt": prompt, "stream": False, "options": {"temperature": 0.1, "num_predict": 1536, "repeat_penalty": 1.1, "num_thread": int(C.get("threads", 5))}, "keep_alive": C.get("keep_alive", "30m")}
     req = urllib.request.Request(C["ollama"] + "/api/generate", data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
-    with NOPROXY.open(req, timeout=600) as r:
-        return json.loads(r.read())["response"]
+    for attempt in range(4):  # v3.8.2: retry transient model-server errors (HTTP 5xx, dropped connection)
+        try:
+            with NOPROXY.open(req, timeout=600) as r:
+                return json.loads(r.read())["response"]
+        except urllib.error.HTTPError as e:
+            if e.code < 500 or attempt == 3:
+                raise
+        except (urllib.error.URLError, ConnectionError):
+            if attempt == 3:
+                raise
+        time.sleep(5 * 3 ** attempt)
 
 
 def extract(text):
@@ -2353,6 +2362,39 @@ def hunt_tests(spec, model, asker):
     return "\n".join(edges), out[:10]
 
 
+def doctests(spec):
+    """Docstring Examples (v3.11): every '>>> call' line in the task, with the expected output on the
+    next line, becomes an assert (a blank expected line means None). These examples are part of the
+    task the model sees, so this uses no hidden data. Unparseable examples are skipped."""
+    out, lines = [], spec.splitlines()
+    for i, ln in enumerate(lines):
+        m = re.match(r"\s*>>>\s*(.+)$", ln)
+        if not m:
+            continue
+        call, want = m.group(1).strip(), []
+        for nxt in lines[i + 1:]:
+            if re.match(r"\s*>>>", nxt) or not nxt.strip() or nxt.strip() in ('"' * 3, "'" * 3):
+                break
+            want.append(nxt.strip())
+        exp = " ".join(want)
+        try:
+            node = ast.parse(call, mode="eval").body
+            if isinstance(node, ast.Compare) and not exp:
+                line = f"assert {call}"  # the example is already a check, like f(x) == y
+            elif isinstance(node, ast.Call):
+                line = f"assert {call} == {exp}" if exp else f"assert {call} is None"
+                if exp:
+                    ast.literal_eval(exp)
+            else:
+                continue
+            ast.parse(line)
+        except (SyntaxError, ValueError):
+            continue
+        if line not in out:
+            out.append(line)
+    return out[:8]
+
+
 def probes(spec):
     """Stress Probe (v3.6): property checks built ONLY from the task text, with no answer key.
     1) The task says integers/numbers: the task's own example with its first number made negative
@@ -2441,7 +2483,7 @@ def genius_code(spec, model, asker, lister=None):
     drafts = [lint_fix(spec, extract(asker(STYLES[s] + spec, model))) for s in ("plain", "expert", "steps", "algo")]
     drafts.append(lint_fix(spec, extract(asker(STYLES["lawyer"] + pitfalls(spec) + spec, model))))
     edges, mine = hunt_tests(spec, judge, asker)
-    mine = sane(mine, drafts) + probes(spec)
+    mine = sane(mine, drafts) + probes(spec) + doctests(spec)
     hint = ("\nEdge cases to handle:\n" + edges + "\n") if edges else ""
     best, n = pick(drafts, mine)
     if mine and n == len(mine) and agreed(drafts, mine, best):
@@ -2787,6 +2829,8 @@ def selftest():
         and not agreed([rev, "def reverse_words(s):\n    return s\n"], ["assert reverse_words('a b')=='b a'"], rev))
     chk("lint_fix turns // into int(a / b) only when the task says truncate",
         "int(a / b)" in lint_fix(HARD[0][2], "x = a // b") and lint_fix(TASKS[0][2], "x = a // b") == "x = a // b")
+    chk("Docstring Examples become asserts, a blank result means None",
+        doctests(">>> f([])\n\n>>> f(['a', 'bb'])\n'bb'\n") == ["assert f([]) is None", "assert f(['a', 'bb']) == 'bb'"])
     chk("Stress Probe: no probes for two-argument functions", probes(TASKS[9][2]) == [])
     hd = he_data()["tasks"]
     chk("HumanEval+ slice: 40 tasks, each with hidden cases", len(hd) == 40 and all(len(t["cases"]) >= 4 for t in hd))
