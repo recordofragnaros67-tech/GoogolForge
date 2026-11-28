@@ -118,3 +118,11 @@ All four use the same sealed judge: the model sees only the task prompt, a failu
 ## Autopilot (v3.10)
 
 `bash scripts/autopilot.sh` runs the routine in order: update, start the local AI, self-test, quick exam, Genius exam (only while charging), and a report. It resumes where it stopped and skips steps already done today. It finishes by suggesting your next moves based on this phone's own scores. `--suggest` prints only the suggestions. `--schedule` runs it every night at 3:00 through cronie, and `--unschedule` removes that. Nothing is published automatically.
+
+## Grandmaster (v3.12): the whole routine with a local AI Coach
+
+```
+curl -fsSL https://raw.githubusercontent.com/recordofragnaros67-tech/GoogolForge/main/scripts/grandmaster.sh -o ~/grandmaster.sh && bash ~/grandmaster.sh
+```
+
+It prepares the phone (RAM, storage, battery), updates, starts the local AI, picks models by free RAM, runs the self-test and a baseline exam, then lets the phone's own AI Coach pick the next exams from a fixed, safe menu (it can't run anything else). Long exams run only while charging. It ends with a report, next-move suggestions and a notification. Options: `--yes` (no questions), `--dry` (plan only), `--minutes N`, `--rounds N`, `--schedule` (nightly at 3:30), `--report`. Scores are real sealed-judge results; nothing is published.
